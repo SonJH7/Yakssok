@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SECRET_KEY: "${{ secrets.SECRET_KEY || 'test-secret' }}"
+  ALGORITHM: "${{ secrets.ALGORITHM || 'HS256' }}"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES || '60' }}"
+  REFRESH_TOKEN_EXPIRE_MINUTES: "${{ secrets.REFRESH_TOKEN_EXPIRE_MINUTES || '120' }}"
+  SQLALCHEMY_DATABASE_URL_USER: "${{ secrets.SQLALCHEMY_DATABASE_URL_USER || 'sqlite+aiosqlite:///:memory:' }}"
+  GOOGLE_CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID || 'client-id' }}"
+  GOOGLE_CLIENT_SECRET: "${{ secrets.GOOGLE_CLIENT_SECRET || 'client-secret' }}"
+  GOOGLE_REDIRECT_URI: "${{ secrets.GOOGLE_REDIRECT_URI || 'http://localhost:7777/user/callback' }}"
+  FRONTEND_URL: "${{ secrets.FRONTEND_URL || 'localhost:5173' }}"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  backend-lint:
+    name: Lint & Type Check (pre-commit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pre-commit
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  backend-tests:
+    name: Backend Test Suite
+    needs: backend-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest with coverage
+        run: pytest --maxfail=1 --disable-warnings --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+
+  backend-security:
+    name: Dependency Audit
+    needs: backend-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt
+
+  backend-docker-build:
+    name: Backend Docker Build
+    needs:
+      - backend-tests
+      - backend-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
