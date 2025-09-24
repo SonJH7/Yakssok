@@ -1,8 +1,7 @@
 backend/app/.env
 backend/.venv
 backend/.vscode
-backend/app/__pycache__/
-backend/tests/__pycache__/
+__pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
