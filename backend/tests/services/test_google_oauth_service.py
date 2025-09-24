@@ -2,43 +2,73 @@ import importlib
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi import HTTPException
 
 
-@pytest.fixture(autouse=True)
-def setup_env(monkeypatch):
+@pytest.fixture
+def load_google_service(monkeypatch):
+    """환경 변수를 구성한 뒤 Google OAuth 서비스를 다시 로드한다."""
+
     root_dir = Path(__file__).resolve().parents[2]
     if str(root_dir) not in sys.path:
         sys.path.insert(0, str(root_dir))
-    monkeypatch.setenv("SECRET_KEY", "test-secret")
-    monkeypatch.setenv("ALGORITHM", "HS256")
-    monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-    monkeypatch.setenv("REFRESH_TOKEN_EXPIRE_MINUTES", "120")
-    monkeypatch.setenv("SQLALCHEMY_DATABASE_URL_USER", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("GOOGLE_CLIENT_ID", "client")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("GOOGLE_REDIRECT_URI", "http://localhost/callback")
-    import app.variable  # noqa: F401
 
-    importlib.reload(app.variable)
-    import app.services.google_oauth_service  # noqa: F401
+    def _loader(*, force_prompt: bool = False):
+        monkeypatch.setenv("SECRET_KEY", "test-secret")
+        monkeypatch.setenv("ALGORITHM", "HS256")
+        monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+        monkeypatch.setenv("REFRESH_TOKEN_EXPIRE_MINUTES", "120")
+        monkeypatch.setenv(
+            "SQLALCHEMY_DATABASE_URL_USER", "sqlite+aiosqlite:///:memory:"
+        )
+        monkeypatch.setenv("GOOGLE_CLIENT_ID", "client")
+        monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
+        monkeypatch.setenv("GOOGLE_REDIRECT_URI", "http://localhost/callback")
+        monkeypatch.setenv(
+            "GOOGLE_FORCE_PROMPT_CONSENT", "true" if force_prompt else "false"
+        )
 
-    importlib.reload(app.services.google_oauth_service)
+        import app.variable  # noqa: F401
+
+        importlib.reload(app.variable)
+        import app.services.google_oauth_service  # noqa: F401
+
+        importlib.reload(app.services.google_oauth_service)
+
+        return app.services.google_oauth_service
+
+    return _loader
 
 
-def test_generate_auth_url_contains_parameters():
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_generate_auth_url_contains_parameters(load_google_service):
+    service = load_google_service()
 
-    url = GoogleOAuthService.generate_auth_url()
-    assert "client_id=client" in url
-    assert "redirect_uri=http%3A%2F%2Flocalhost%2Fcallback" in url
-    assert "scope=openid+email+profile" in url
+    url = service.GoogleOAuthService.generate_auth_url()
+    query = parse_qs(urlparse(url).query)
+
+    assert query["client_id"] == ["client"]
+    assert query["redirect_uri"] == ["http://localhost/callback"]
+    assert query["scope"] == [
+        "openid email profile https://www.googleapis.com/auth/calendar.events.readonly"
+    ]
+    assert query["access_type"] == ["offline"]
+    assert query["include_granted_scopes"] == ["true"]
+    assert "prompt" not in query
 
 
-def test_exchange_code_for_tokens_success(monkeypatch):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_generate_auth_url_includes_prompt_when_forced(load_google_service):
+    service = load_google_service(force_prompt=True)
+    url = service.GoogleOAuthService.generate_auth_url()
+    query = parse_qs(urlparse(url).query)
+
+    assert query["prompt"] == ["consent"]
+
+
+def test_exchange_code_for_tokens_success(load_google_service, monkeypatch):
+    service = load_google_service()
 
     def mock_post(url, data):
         assert "oauth2.googleapis.com/token" in url
@@ -48,7 +78,7 @@ def test_exchange_code_for_tokens_success(monkeypatch):
         )
 
     monkeypatch.setattr("requests.post", mock_post)
-    tokens = GoogleOAuthService.exchange_code_for_tokens("auth-code")
+    tokens = service.GoogleOAuthService.exchange_code_for_tokens("auth-code")
 
     assert tokens == {"access_token": "access", "refresh_token": "refresh"}
 
@@ -60,8 +90,10 @@ def test_exchange_code_for_tokens_success(monkeypatch):
         {},
     ],
 )
-def test_exchange_code_for_tokens_missing_access_token(response_json, monkeypatch):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_exchange_code_for_tokens_missing_access_token(
+    response_json, load_google_service, monkeypatch
+):
+    service = load_google_service()
 
     def mock_post(url, data):
         return SimpleNamespace(
@@ -71,29 +103,29 @@ def test_exchange_code_for_tokens_missing_access_token(response_json, monkeypatc
     monkeypatch.setattr("requests.post", mock_post)
 
     with pytest.raises(HTTPException) as exc:
-        GoogleOAuthService.exchange_code_for_tokens("code")
+        service.GoogleOAuthService.exchange_code_for_tokens("code")
 
     assert exc.value.status_code == 400
 
 
-def test_exchange_code_for_tokens_request_failure(monkeypatch):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_exchange_code_for_tokens_request_failure(load_google_service, monkeypatch):
+    import requests
+
+    service = load_google_service()
 
     def mock_post(url, data):
         raise requests.RequestException("boom")
 
-    import requests
-
     monkeypatch.setattr("requests.post", mock_post)
 
     with pytest.raises(HTTPException) as exc:
-        GoogleOAuthService.exchange_code_for_tokens("code")
+        service.GoogleOAuthService.exchange_code_for_tokens("code")
 
     assert exc.value.status_code == 500
 
 
-def test_get_user_info_success(monkeypatch):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_get_user_info_success(load_google_service, monkeypatch):
+    service = load_google_service()
 
     def mock_get(url):
         assert "userinfo" in url
@@ -103,7 +135,7 @@ def test_get_user_info_success(monkeypatch):
         )
 
     monkeypatch.setattr("requests.get", mock_get)
-    user_info = GoogleOAuthService.get_user_info("token")
+    user_info = service.GoogleOAuthService.get_user_info("token")
 
     assert user_info == {
         "google_id": "123",
@@ -120,8 +152,8 @@ def test_get_user_info_success(monkeypatch):
         {},
     ],
 )
-def test_get_user_info_missing_fields(monkeypatch, response_json):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_get_user_info_missing_fields(load_google_service, monkeypatch, response_json):
+    service = load_google_service()
 
     def mock_get(url):
         return SimpleNamespace(
@@ -131,14 +163,15 @@ def test_get_user_info_missing_fields(monkeypatch, response_json):
     monkeypatch.setattr("requests.get", mock_get)
 
     with pytest.raises(HTTPException) as exc:
-        GoogleOAuthService.get_user_info("token")
+        service.GoogleOAuthService.get_user_info("token")
 
     assert exc.value.status_code == 400
 
 
-def test_get_user_info_request_failure(monkeypatch):
-    from app.services.google_oauth_service import GoogleOAuthService
+def test_get_user_info_request_failure(load_google_service, monkeypatch):
     import requests
+
+    service = load_google_service()
 
     def mock_get(url):
         raise requests.RequestException("boom")
@@ -146,6 +179,6 @@ def test_get_user_info_request_failure(monkeypatch):
     monkeypatch.setattr("requests.get", mock_get)
 
     with pytest.raises(HTTPException) as exc:
-        GoogleOAuthService.get_user_info("token")
+        service.GoogleOAuthService.get_user_info("token")
 
     assert exc.value.status_code == 500
