@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.session import get_db
-from app.variable import FRONTEND_URL
 from app.services.google_oauth_service import GoogleOAuthService
 from app.services.user_service import UserService
 from app.utils.jwt import create_access_token
+from app.variable import FRONTEND_URL
+
 
 security = HTTPBearer()
 
@@ -14,10 +16,12 @@ router = APIRouter(
     prefix="/user",
 )
 
+
 @router.get("/google/login")
 async def google_login():
     auth_url = GoogleOAuthService.generate_auth_url()
     return {"auth_url": auth_url}
+
 
 @router.get("/callback")
 async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
@@ -34,7 +38,9 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         name = user_info["name"]
 
         # 사용자 조회 또는 생성
-        user = await UserService.get_or_create_user(google_id, email, name, refresh_token, db)
+        user = await UserService.get_or_create_user(
+            google_id, email, name, refresh_token, db
+        )
 
         # JWT 토큰 생성
         jwt_access_token = create_access_token(data={"sub": user.user_id})

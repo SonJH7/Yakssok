@@ -103,6 +103,40 @@ def test_update_refresh_token(session_factory):
     assert updated_token == "new-refresh"
 
 
+def test_update_refresh_token_ignores_none(session_factory):
+    from app.services.user_service import UserService
+
+    async def scenario():
+        async with session_factory() as session:
+            user = await UserService.create_user(
+                "gid", "user@example.com", "User", "refresh", session
+            )
+            await UserService.update_refresh_token(user, None, session)
+            await session.refresh(user)
+            return user.google_refresh_token
+
+    token = asyncio.run(scenario())
+
+    assert token == "refresh"
+
+
+def test_update_refresh_token_ignores_empty_string(session_factory):
+    from app.services.user_service import UserService
+
+    async def scenario():
+        async with session_factory() as session:
+            user = await UserService.create_user(
+                "gid", "user@example.com", "User", "refresh", session
+            )
+            await UserService.update_refresh_token(user, "", session)
+            await session.refresh(user)
+            return user.google_refresh_token
+
+    token = asyncio.run(scenario())
+
+    assert token == "refresh"
+
+
 def test_get_or_create_user_creates_new(session_factory):
     from app.services.user_service import UserService
 
