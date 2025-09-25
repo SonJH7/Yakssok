@@ -26,26 +26,23 @@ def setup_env(monkeypatch):
 
 
 @pytest.fixture
-def route_module(monkeypatch):
-    import app.routes.calendar_route as calendar_route
+def route_module():
+    import app.routes.calendar_route as module
 
-    calendar_route = importlib.reload(calendar_route)
-
-    return calendar_route
+    return importlib.reload(module)
 
 
 def test_requires_jwt_header(route_module):
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(route_module.list_events(credentials=None))
-
-    assert exc.value.status_code == 401
+        asyncio.run(route_module.list_events(db=SimpleNamespace(), credentials=None))
+    assert exc.value.detail == "인증 토큰이 필요합니다."
 
 
 def test_missing_refresh_token_returns_scope_error(route_module, monkeypatch):
     monkeypatch.setattr(route_module, "verify_token", lambda token: {"sub": "user"})
 
     async def _get_user(*args, **kwargs):
-        return SimpleNamespace(google_refresh_token="")
+        return SimpleNamespace(google_refresh_token=None)
 
     monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
 
@@ -58,9 +55,8 @@ def test_missing_refresh_token_returns_scope_error(route_module, monkeypatch):
 
     assert isinstance(response, JSONResponse)
     assert response.status_code == 400
-    assert (
-        response.body
-        == b'{"code":"calendar_scope_missing","reauthUrl":"/user/google/login?force=1"}'
+    assert response.body == (
+        b'{"code":"calendar_scope_missing","reauthUrl":"/user/google/login?force=1"}'
     )
 
 
@@ -119,7 +115,78 @@ def test_invalid_grant_triggers_reauth(route_module, monkeypatch):
 
     assert isinstance(response, JSONResponse)
     assert response.status_code == 401
-    assert (
-        response.body
-        == b'{"code":"calendar_refresh_failed","reauthUrl":"/user/google/login?force=1"}'
+    assert response.body == (
+        b'{"code":"google_reauth_required","reauthUrl":"/user/google/login?force=1"}'
+    )
+
+
+def test_list_events_insufficient_scope(route_module, monkeypatch):
+    monkeypatch.setattr(route_module, "verify_token", lambda token: {"sub": "user"})
+
+    async def _get_user(*args, **kwargs):
+        return SimpleNamespace(google_refresh_token="refresh")
+
+    monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService,
+        "refresh_access_token",
+        lambda refresh: "access",
+    )
+
+    def _raise_insufficient(*args, **kwargs):
+        raise HTTPException(status_code=403, detail="insufficient_scope")
+
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService,
+        "list_primary_events",
+        _raise_insufficient,
+    )
+
+    response = asyncio.run(
+        route_module.list_events(
+            db=SimpleNamespace(),
+            credentials=SimpleNamespace(scheme="Bearer", credentials="jwt"),
+        )
+    )
+
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 403
+    assert response.body == (
+        b'{"code":"insufficient_scope","reauthUrl":"/user/google/login?force=1"}'
+    )
+
+
+def test_list_events_requires_reauth(route_module, monkeypatch):
+    monkeypatch.setattr(route_module, "verify_token", lambda token: {"sub": "user"})
+
+    async def _get_user(*args, **kwargs):
+        return SimpleNamespace(google_refresh_token="refresh")
+
+    monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService,
+        "refresh_access_token",
+        lambda refresh: "access",
+    )
+
+    def _raise_reauth(*args, **kwargs):
+        raise HTTPException(status_code=401, detail="google_reauth_required")
+
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService,
+        "list_primary_events",
+        _raise_reauth,
+    )
+
+    response = asyncio.run(
+        route_module.list_events(
+            db=SimpleNamespace(),
+            credentials=SimpleNamespace(scheme="Bearer", credentials="jwt"),
+        )
+    )
+
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 401
+    assert response.body == (
+        b'{"code":"google_reauth_required","reauthUrl":"/user/google/login?force=1"}'
     )

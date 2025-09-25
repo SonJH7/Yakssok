@@ -6,7 +6,7 @@ services:
         context: ./backend
       volumes:
         - ./backend:/app
-      # env_file:
-      #   - ./backend/.env
+      env_file:
+         - ./backend/.env
       ports:
         - "7777:7777"

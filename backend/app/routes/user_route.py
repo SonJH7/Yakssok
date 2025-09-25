@@ -18,8 +18,8 @@ router = APIRouter(
 
 
 @router.get("/google/login")
-async def google_login():
-    auth_url = GoogleOAuthService.generate_auth_url()
+async def google_login(force: int | None = None):
+    auth_url = GoogleOAuthService.generate_auth_url(force_prompt_consent=bool(force))
     return {"auth_url": auth_url}
 
 

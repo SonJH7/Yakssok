@@ -100,9 +100,10 @@ class GoogleCalendarService:
             response.status_code,
             error_info,
         )
-
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="google_reauth_required")
         if response.status_code == 403:
-            raise HTTPException(status_code=403, detail="insufficient_permissions")
+            raise HTTPException(status_code=403, detail="insufficient_scope")
         if response.status_code == 429:
             raise HTTPException(status_code=429, detail="rate_limited")
 

@@ -14,6 +14,8 @@ security = HTTPBearer(auto_error=False)
 
 router = APIRouter(prefix="/calendar")
 
+REAUTH_URL = "/user/google/login?force=1"
+
 
 @router.get("/events")
 async def list_events(
@@ -38,7 +40,7 @@ async def list_events(
             status_code=400,
             content={
                 "code": "calendar_scope_missing",
-                "reauthUrl": "/user/google/login?force=1",
+                "reauthUrl": REAUTH_URL,
             },
         )
 
@@ -51,17 +53,37 @@ async def list_events(
             return JSONResponse(
                 status_code=401,
                 content={
-                    "code": "calendar_refresh_failed",
-                    "reauthUrl": "/user/google/login?force=1",
+                    "code": "google_reauth_required",
+                    "reauthUrl": REAUTH_URL,
                 },
             )
         raise
 
-    events_payload = GoogleCalendarService.list_primary_events(
-        access_token,
-        time_min=time_min,
-        time_max=time_max,
-        max_results=max_results,
-        page_token=page_token,
-    )
+    try:
+        events_payload = GoogleCalendarService.list_primary_events(
+            access_token,
+            time_min=time_min,
+            time_max=time_max,
+            max_results=max_results,
+            page_token=page_token,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "code": "google_reauth_required",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        if exc.status_code == 403:
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "code": "insufficient_scope",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        raise
+
     return events_payload

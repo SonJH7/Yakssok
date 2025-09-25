@@ -11,7 +11,7 @@ from app.variable import (
 
 class GoogleOAuthService:
     @staticmethod
-    def generate_auth_url():
+    def generate_auth_url(force_prompt_consent: bool = False):
         # Google OAuth 인증 URL 생성
         scope = (
             "openid email profile "
@@ -25,7 +25,7 @@ class GoogleOAuthService:
             "access_type": "offline",
             "include_granted_scopes": "true",
         }
-        if GOOGLE_FORCE_PROMPT_CONSENT:
+        if GOOGLE_FORCE_PROMPT_CONSENT or force_prompt_consent:
             params["prompt"] = "consent"
         return "https://accounts.google.com/o/oauth2/auth?" + urllib.parse.urlencode(
             params
