@@ -16,6 +16,8 @@ export const useLayout = () => {
         onToday: config.onToday,
         viewType: config.viewType,
         onViewChange: config.onViewChange,
+        onRefresh: config.onRefresh,
+        isRefreshing: config.isRefreshing,
       });
     },
     [context],

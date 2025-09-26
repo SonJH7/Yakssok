@@ -15,6 +15,8 @@ export interface HeaderConfig {
   onToday?: () => void;
   viewType: ViewType;
   onViewChange?: (view: ViewType) => void;
+  onRefresh?: () => void | Promise<void>;
+  isRefreshing?: boolean;
 }
 
 interface LayoutContextValue {
@@ -32,6 +34,7 @@ interface LayoutProps {
 const defaultHeader: HeaderConfig = {
   periodLabel: '',
   viewType: 'weekly',
+  isRefreshing: false,
 };
 
 const infoPanelContent = [
@@ -89,6 +92,8 @@ const Layout = ({ children }: LayoutProps) => {
             onToday={headerConfig.onToday}
             viewType={headerConfig.viewType}
             onViewChange={headerConfig.onViewChange}
+            onRefresh={headerConfig.onRefresh}
+            isRefreshing={headerConfig.isRefreshing}
             onToggleInfo={() => setInfoOpen((prev) => !prev)}
             onLogout={logout}
           />

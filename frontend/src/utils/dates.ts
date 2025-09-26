@@ -14,6 +14,7 @@ import {
   subWeeks,
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { CalendarDateTime } from '../types';
 
 export const getStartOfWeek = (date: Date) => startOfWeek(date, { weekStartsOn: 1 });
 export const getEndOfWeek = (date: Date) => endOfWeek(date, { weekStartsOn: 1 });
@@ -59,11 +60,26 @@ export const isDateInCurrentMonth = (date: Date, current: Date) => isSameMonth(d
 
 export const getDaysCountOfMonth = (date: Date) => getDaysInMonth(date);
 
-export const toValidDate = (value: string | Date | null | undefined) => {
-  if (!value) {
+type DateLike = string | Date | CalendarDateTime | null | undefined;
+
+export const toValidDate = (value: DateLike) => {  if (!value) {
     return null;
   }
 
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const dateString = value.dateTime ?? value.date;
+  if (!dateString) {
+    return null;
+  }
+
+  const parsed = new Date(dateString);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };

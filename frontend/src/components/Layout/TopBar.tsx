@@ -8,6 +8,8 @@ interface TopBarProps {
   onToday?: () => void;
   viewType: ViewType;
   onViewChange?: (view: ViewType) => void;
+  onRefresh?: () => void | Promise<void>;
+  isRefreshing?: boolean;
   onToggleInfo: () => void;
   onLogout: () => void;
 }
@@ -19,6 +21,8 @@ const TopBar = ({
   onToday,
   viewType,
   onViewChange,
+  onRefresh,
+  isRefreshing,
   onToggleInfo,
   onLogout,
 }: TopBarProps) => {
@@ -53,6 +57,19 @@ const TopBar = ({
       </div>
       <div className="text-lg font-semibold text-ink">{periodLabel}</div>
       <div className="flex items-center gap-3">
+        {onRefresh && (
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1 text-sm text-ink transition hover:border-positive hover:text-positive disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => {
+              void onRefresh();
+            }}
+            disabled={Boolean(isRefreshing)}
+            aria-busy={Boolean(isRefreshing)}
+          >
+            {isRefreshing ? '동기화 중...' : '새로고침'}
+          </button>
+        )}
         <div className="flex rounded-full border border-border bg-white/70 p-1">
           {views.map((view) => (
             <button
