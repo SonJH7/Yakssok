@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import classNames from 'classnames';
 import { CalendarEvent } from '../../types';
-import { getMonthMatrix, isDateInCurrentMonth } from '../../utils/dates';
+import { getMonthMatrix, isDateInCurrentMonth, toValidDate } from '../../utils/dates';
 import { getEventColorClass } from '../../utils/colors';
 
 interface MonthlyGridProps {
@@ -12,7 +12,12 @@ interface MonthlyGridProps {
 const MonthlyGrid = ({ events, current }: MonthlyGridProps) => {
   const matrix = getMonthMatrix(current);
   const eventsByDate = events.reduce<Record<string, CalendarEvent[]>>((acc, event) => {
-    const dateKey = format(new Date(event.start), 'yyyy-MM-dd');
+    const eventDate = toValidDate(event.start);
+    if (!eventDate) {
+      return acc;
+    }
+
+    const dateKey = format(eventDate, 'yyyy-MM-dd');
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }

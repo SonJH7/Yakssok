@@ -46,7 +46,8 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         jwt_access_token = create_access_token(data={"sub": user.user_id})
 
         # 프론트엔드로 리디렉션
-        redirect_url = f"{FRONTEND_URL}/auth/callback?access_token={jwt_access_token}"
+        redirect_base = FRONTEND_URL.rstrip("/")
+        redirect_url = f"{redirect_base}/auth/callback?access_token={jwt_access_token}"
         return RedirectResponse(url=redirect_url)
 
     except HTTPException:

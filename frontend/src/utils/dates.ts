@@ -58,3 +58,12 @@ export const getMonthMatrix = (date: Date) => {
 export const isDateInCurrentMonth = (date: Date, current: Date) => isSameMonth(date, current);
 
 export const getDaysCountOfMonth = (date: Date) => getDaysInMonth(date);
+
+export const toValidDate = (value: string | Date | null | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};

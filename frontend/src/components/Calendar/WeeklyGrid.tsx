@@ -7,7 +7,7 @@ import {
   setSeconds,
 } from 'date-fns';
 import { CalendarEvent } from '../../types';
-import { getWeekDays } from '../../utils/dates';
+import { getWeekDays, toValidDate } from '../../utils/dates';
 import EventItem from './EventItem';
 
 interface WeeklyGridProps {
@@ -44,8 +44,11 @@ const getPositionedEvents = (events: CalendarEvent[], day: Date): PositionedEven
 
   const filtered = events
     .map((event) => {
-      const rawStart = new Date(event.start);
-      const rawEnd = new Date(event.end);
+      const rawStart = toValidDate(event.start);
+      const rawEnd = toValidDate(event.end);
+      if (!rawStart || !rawEnd) {
+        return null;
+      }
       const start = clampToDayRange(rawStart, day);
       const end = clampToDayRange(rawEnd, day);
       if (end <= dayStart || start >= dayEnd) {
@@ -145,8 +148,12 @@ const WeeklyGrid = ({ events, start }: WeeklyGridProps) => {
           <div className="absolute inset-0 grid grid-cols-7">
             {days.map((day) => {
               const dayEvents = events.filter((event) => {
-                const eventStart = new Date(event.start);
-                const eventEnd = new Date(event.end);
+                const eventStart = toValidDate(event.start);
+                const eventEnd = toValidDate(event.end);
+                if (!eventStart || !eventEnd) {
+                  return false;
+                }
+
                 return eventEnd > day && eventStart < addHours(day, 24);
               });
               const positioned = getPositionedEvents(dayEvents, day);
