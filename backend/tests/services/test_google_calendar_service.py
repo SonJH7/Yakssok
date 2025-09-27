@@ -1,8 +1,11 @@
+import asyncio
 import importlib
+import inspect
 import sys
 from pathlib import Path
 from typing import Any, Dict
 
+import anyio
 import pytest
 from fastapi import HTTPException
 
@@ -13,6 +16,24 @@ def setup_env(monkeypatch):
     if str(root_dir) not in sys.path:
         sys.path.insert(0, str(root_dir))
 
+    if "httpx" not in sys.modules:
+        import types
+
+        class _StubRequestError(Exception):
+            pass
+
+        class _StubAsyncClient:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("httpx not installed")
+
+            async def aclose(self):
+                pass
+
+        stub = types.SimpleNamespace(
+            AsyncClient=_StubAsyncClient, RequestError=_StubRequestError
+        )
+        sys.modules["httpx"] = stub
+
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "client")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
 
@@ -22,10 +43,18 @@ def setup_env(monkeypatch):
 
 
 @pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture
 def service_module():
     import app.services.google_calendar_service as module
 
-    return importlib.reload(module)
+    reloaded = importlib.reload(module)
+    reloaded.GoogleCalendarService._client = None
+    reloaded.GoogleCalendarService._client_lock = None
+    return reloaded
 
 
 class _FakeResponse:
@@ -40,48 +69,173 @@ class _FakeResponse:
         return self._data
 
 
-def test_refresh_access_token_success(service_module, monkeypatch):
-    response = _FakeResponse(data={"access_token": "new-token"})
-    monkeypatch.setattr(service_module.requests, "post", lambda *a, **k: response)
+class _FakeClient:
+    def __init__(self, *, post=None, get=None):
+        self._post = post
+        self._get = get
+        self.post_calls: list[Dict[str, Any]] = []
+        self.get_calls: list[Dict[str, Any]] = []
+        self.closed = False
 
-    token = service_module.GoogleCalendarService.refresh_access_token("refresh")
+    async def post(self, *args, **kwargs):
+        self.post_calls.append({"args": args, "kwargs": kwargs})
+        if self._post is None:
+            raise AssertionError("post handler not configured")
+        result = self._post(*args, **kwargs)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
+
+    async def get(self, *args, **kwargs):
+        self.get_calls.append({"args": args, "kwargs": kwargs})
+        if self._get is None:
+            raise AssertionError("get handler not configured")
+        result = self._get(*args, **kwargs)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
+
+    async def aclose(self):
+        self.closed = True
+
+
+def _override_client(monkeypatch, service_module, client):
+    async def _get_client(cls):
+        return client
+
+    monkeypatch.setattr(
+        service_module.GoogleCalendarService,
+        "_get_client",
+        classmethod(_get_client),
+    )
+    service_module.GoogleCalendarService._client = client
+
+
+@pytest.mark.anyio
+async def test_get_client_reuses_instance(service_module, monkeypatch):
+    created = {}
+
+    class _StubAsyncClient:
+        def __init__(self, *args, **kwargs):
+            created.setdefault("count", 0)
+            created["count"] += 1
+            created["kwargs"] = kwargs
+            self.closed = False
+
+        async def aclose(self):
+            self.closed = True
+
+    monkeypatch.setattr(service_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    client1 = await service_module.GoogleCalendarService._get_client()
+    client2 = await service_module.GoogleCalendarService._get_client()
+
+    assert client1 is client2
+    assert created["count"] == 1
+    assert created["kwargs"]["timeout"] == service_module.GoogleCalendarService._TIMEOUT
+
+    await service_module.GoogleCalendarService.close_client()
+    assert client1.closed is True
+    assert service_module.GoogleCalendarService._client is None
+
+
+@pytest.mark.anyio
+async def test_client_lock_initialized_lazily(service_module, monkeypatch):
+    assert service_module.GoogleCalendarService._client_lock is None
+
+    class _StubAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(service_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    await service_module.GoogleCalendarService._get_client()
+
+    assert isinstance(
+        service_module.GoogleCalendarService._client_lock, asyncio.Lock
+    )
+
+    await service_module.GoogleCalendarService.close_client()
+
+
+@pytest.mark.anyio
+async def test_close_client_resets_lock_for_new_event_loop(service_module, monkeypatch):
+    created = {"count": 0}
+
+    class _StubAsyncClient:
+        def __init__(self, *args, **kwargs):
+            created["count"] += 1
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(service_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    await service_module.GoogleCalendarService._get_client()
+    await service_module.GoogleCalendarService.close_client()
+
+    assert service_module.GoogleCalendarService._client is None
+    assert service_module.GoogleCalendarService._client_lock is None
+
+    async def _use_service_again():
+        await service_module.GoogleCalendarService._get_client()
+        await service_module.GoogleCalendarService.close_client()
+
+    await anyio.to_thread.run_sync(lambda: asyncio.run(_use_service_again()))
+
+    assert created["count"] == 2
+    assert service_module.GoogleCalendarService._client is None
+    assert service_module.GoogleCalendarService._client_lock is None
+
+@pytest.mark.anyio
+async def test_refresh_access_token_success(service_module, monkeypatch):
+    response = _FakeResponse(data={"access_token": "new-token"})
+    client = _FakeClient(post=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
+
+    token = await service_module.GoogleCalendarService.refresh_access_token("refresh")
 
     assert token == "new-token"
+    assert client.post_calls[0]["args"][0] == service_module.GoogleCalendarService.TOKEN_URL
 
 
-def test_refresh_access_token_invalid_grant(service_module, monkeypatch):
+@pytest.mark.anyio
+async def test_refresh_access_token_invalid_grant(service_module, monkeypatch):
     response = _FakeResponse(status_code=400, data={"error": "invalid_grant"})
-    monkeypatch.setattr(service_module.requests, "post", lambda *a, **k: response)
+    client = _FakeClient(post=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
     with pytest.raises(HTTPException) as exc:
-        service_module.GoogleCalendarService.refresh_access_token("refresh")
+        await service_module.GoogleCalendarService.refresh_access_token("refresh")
 
     assert exc.value.status_code == 401
     assert exc.value.detail == "invalid_grant"
 
 
-def test_refresh_access_token_server_error(service_module, monkeypatch):
+@pytest.mark.anyio
+async def test_refresh_access_token_server_error(service_module, monkeypatch):
     response = _FakeResponse(status_code=503, data={"error": "server_error"})
-    monkeypatch.setattr(service_module.requests, "post", lambda *a, **k: response)
+    client = _FakeClient(post=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
     with pytest.raises(HTTPException) as exc:
-        service_module.GoogleCalendarService.refresh_access_token("refresh")
+        await service_module.GoogleCalendarService.refresh_access_token("refresh")
 
     assert exc.value.status_code == 500
 
 
-def test_list_primary_events_success(service_module, monkeypatch):
-    captured: Dict[str, Any] = {}
+@pytest.mark.anyio
+async def test_list_primary_events_success(service_module, monkeypatch):
+    response = _FakeResponse(
+        data={"items": [{"id": "1"}], "nextPageToken": "next-token"}
+    )
+    client = _FakeClient(get=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
-    def _fake_get(*args, **kwargs):
-        captured.update(kwargs)
-        return _FakeResponse(
-            data={"items": [{"id": "1"}], "nextPageToken": "next-token"}
-        )
-
-    monkeypatch.setattr(service_module.requests, "get", _fake_get)
-
-    result = service_module.GoogleCalendarService.list_primary_events(
+    result = await service_module.GoogleCalendarService.list_primary_events(
         "access",
         time_min="2024-01-01T00:00:00Z",
         time_max="2024-01-31T23:59:59Z",
@@ -90,22 +244,30 @@ def test_list_primary_events_success(service_module, monkeypatch):
     )
 
     assert result == {"events": [{"id": "1"}], "nextPageToken": "next-token"}
-    assert captured["headers"] == {"Authorization": "Bearer access"}
-    assert captured["params"]["timeMin"] == "2024-01-01T00:00:00Z"
-    assert captured["params"]["timeMax"] == "2024-01-31T23:59:59Z"
-    assert captured["params"]["pageToken"] == "page"
-    assert captured["params"]["maxResults"] == "10"
-
-
-def test_list_primary_events_forbidden(service_module, monkeypatch):
-    response = _FakeResponse(
-        status_code=403, data={"error": {"message": "insufficient"}}
+    call = client.get_calls[0]
+    params = call["kwargs"]["params"]
+    assert params["timeMin"] == "2024-01-01T00:00:00Z"
+    assert params["timeMax"] == "2024-01-31T23:59:59Z"
+    assert params["pageToken"] == "page"
+    assert params["maxResults"] == "10"
+    assert (
+        params["fields"]
+        == "items(id,status,summary,description,location,start,end,htmlLink,"
+        "organizer,creator,attendees,updated),nextPageToken"
     )
 
-    monkeypatch.setattr(service_module.requests, "get", lambda *a, **k: response)
+
+@pytest.mark.anyio
+async def test_list_primary_events_forbidden(service_module, monkeypatch):
+    response = _FakeResponse(
+        status_code=403,
+        data={"error": {"errors": [{"reason": "insufficientPermissions"}]}},
+    )
+    client = _FakeClient(get=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
     with pytest.raises(HTTPException) as exc:
-        service_module.GoogleCalendarService.list_primary_events(
+        await service_module.GoogleCalendarService.list_primary_events(
             "access", time_min=None, time_max=None
         )
 
@@ -113,12 +275,14 @@ def test_list_primary_events_forbidden(service_module, monkeypatch):
     assert exc.value.detail == "insufficient_scope"
 
 
-def test_list_primary_events_requires_reauth(service_module, monkeypatch):
+@pytest.mark.anyio
+async def test_list_primary_events_requires_reauth(service_module, monkeypatch):
     response = _FakeResponse(status_code=401, data={"error": "invalid"})
-    monkeypatch.setattr(service_module.requests, "get", lambda *a, **k: response)
+    client = _FakeClient(get=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
     with pytest.raises(HTTPException) as exc:
-        service_module.GoogleCalendarService.list_primary_events(
+        await service_module.GoogleCalendarService.list_primary_events(
             "access", time_min=None, time_max=None
         )
 
@@ -126,14 +290,46 @@ def test_list_primary_events_requires_reauth(service_module, monkeypatch):
     assert exc.value.detail == "google_reauth_required"
 
 
-def test_list_primary_events_rate_limited(service_module, monkeypatch):
+@pytest.mark.anyio
+async def test_list_primary_events_rate_limited(service_module, monkeypatch):
     response = _FakeResponse(status_code=429, data={"error": {"message": "slow"}})
-    monkeypatch.setattr(service_module.requests, "get", lambda *a, **k: response)
+    client = _FakeClient(get=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
 
     with pytest.raises(HTTPException) as exc:
-        service_module.GoogleCalendarService.list_primary_events(
+        await service_module.GoogleCalendarService.list_primary_events(
             "access", time_min=None, time_max=None
         )
 
     assert exc.value.status_code == 429
     assert exc.value.detail == "rate_limited"
+
+
+@pytest.mark.anyio
+async def test_list_primary_events_scope_missing_from_google_message(
+    service_module, monkeypatch
+):
+    response = _FakeResponse(
+        status_code=400,
+        data={
+            "error": {
+                "message": "Calendar access denied",
+                "errors": [
+                    {
+                        "message": "CalendarAccessDenied",
+                        "reason": "calendarAccessDenied",
+                    }
+                ],
+            }
+        },
+    )
+    client = _FakeClient(get=lambda *args, **kwargs: response)
+    _override_client(monkeypatch, service_module, client)
+
+    with pytest.raises(HTTPException) as exc:
+        await service_module.GoogleCalendarService.list_primary_events(
+            "access", time_min=None, time_max=None
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "calendar_scope_missing"
