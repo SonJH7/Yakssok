@@ -45,7 +45,7 @@ async def list_events(
         )
 
     try:
-        access_token = GoogleCalendarService.refresh_access_token(
+        access_token = await GoogleCalendarService.refresh_access_token(
             user.google_refresh_token
         )
     except HTTPException as exc:
@@ -60,7 +60,7 @@ async def list_events(
         raise
 
     try:
-        events_payload = GoogleCalendarService.list_primary_events(
+        events_payload = await GoogleCalendarService.list_primary_events(
             access_token,
             time_min=time_min,
             time_max=time_max,
@@ -73,6 +73,14 @@ async def list_events(
                 status_code=401,
                 content={
                     "code": "google_reauth_required",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        if exc.status_code == 400 and exc.detail == "calendar_scope_missing":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "code": "calendar_scope_missing",
                     "reauthUrl": REAUTH_URL,
                 },
             )
