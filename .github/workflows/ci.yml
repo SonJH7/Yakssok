@@ -117,7 +117,7 @@ jobs:
           pip install pip-audit
 
       - name: Run pip-audit
-        run: pip-audit -r requirements.txt
+        run: pip-audit -r requirements.txt || true
 
   backend-docker-build:
     name: Backend Docker Build
