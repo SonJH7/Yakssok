@@ -84,14 +84,19 @@ def test_successful_event_fetch(route_module, monkeypatch):
         return SimpleNamespace(google_refresh_token="refresh")
 
     monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
+
     async def _refresh(refresh):
         return "access"
 
     async def _list(*a, **k):
         return {"events": [1, 2], "nextPageToken": "next"}
 
-    monkeypatch.setattr(route_module.GoogleCalendarService, "refresh_access_token", _refresh)
-    monkeypatch.setattr(route_module.GoogleCalendarService, "list_primary_events", _list)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "refresh_access_token", _refresh
+    )
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "list_primary_events", _list
+    )
 
     result = asyncio.run(
         route_module.list_events(
@@ -142,14 +147,19 @@ def test_list_events_insufficient_scope(route_module, monkeypatch):
         return SimpleNamespace(google_refresh_token="refresh")
 
     monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
+
     async def _refresh(refresh):
         return "access"
 
     async def _raise_insufficient(*args, **kwargs):
         raise HTTPException(status_code=403, detail="insufficient_scope")
 
-    monkeypatch.setattr(route_module.GoogleCalendarService, "refresh_access_token", _refresh)
-    monkeypatch.setattr(route_module.GoogleCalendarService, "list_primary_events", _raise_insufficient)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "refresh_access_token", _refresh
+    )
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "list_primary_events", _raise_insufficient
+    )
 
     response = asyncio.run(
         route_module.list_events(
@@ -172,14 +182,19 @@ def test_list_events_requires_reauth(route_module, monkeypatch):
         return SimpleNamespace(google_refresh_token="refresh")
 
     monkeypatch.setattr(route_module.UserService, "get_user_by_google_id", _get_user)
+
     async def _refresh(refresh):
         return "access"
 
     async def _raise_reauth(*args, **kwargs):
         raise HTTPException(status_code=401, detail="google_reauth_required")
 
-    monkeypatch.setattr(route_module.GoogleCalendarService, "refresh_access_token", _refresh)
-    monkeypatch.setattr(route_module.GoogleCalendarService, "list_primary_events", _raise_reauth)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "refresh_access_token", _refresh
+    )
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "list_primary_events", _raise_reauth
+    )
 
     response = asyncio.run(
         route_module.list_events(
@@ -209,7 +224,9 @@ def test_list_events_scope_missing_from_service(route_module, monkeypatch):
     async def _raise_scope_missing(*args, **kwargs):
         raise HTTPException(status_code=400, detail="calendar_scope_missing")
 
-    monkeypatch.setattr(route_module.GoogleCalendarService, "refresh_access_token", _refresh)
+    monkeypatch.setattr(
+        route_module.GoogleCalendarService, "refresh_access_token", _refresh
+    )
     monkeypatch.setattr(
         route_module.GoogleCalendarService, "list_primary_events", _raise_scope_missing
     )

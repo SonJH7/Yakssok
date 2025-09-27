@@ -154,9 +154,7 @@ async def test_client_lock_initialized_lazily(service_module, monkeypatch):
 
     await service_module.GoogleCalendarService._get_client()
 
-    assert isinstance(
-        service_module.GoogleCalendarService._client_lock, asyncio.Lock
-    )
+    assert isinstance(service_module.GoogleCalendarService._client_lock, asyncio.Lock)
 
     await service_module.GoogleCalendarService.close_client()
 
@@ -190,6 +188,7 @@ async def test_close_client_resets_lock_for_new_event_loop(service_module, monke
     assert service_module.GoogleCalendarService._client is None
     assert service_module.GoogleCalendarService._client_lock is None
 
+
 @pytest.mark.anyio
 async def test_refresh_access_token_success(service_module, monkeypatch):
     response = _FakeResponse(data={"access_token": "new-token"})
@@ -199,7 +198,10 @@ async def test_refresh_access_token_success(service_module, monkeypatch):
     token = await service_module.GoogleCalendarService.refresh_access_token("refresh")
 
     assert token == "new-token"
-    assert client.post_calls[0]["args"][0] == service_module.GoogleCalendarService.TOKEN_URL
+    assert (
+        client.post_calls[0]["args"][0]
+        == service_module.GoogleCalendarService.TOKEN_URL
+    )
 
 
 @pytest.mark.anyio

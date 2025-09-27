@@ -124,9 +124,7 @@ class GoogleCalendarService:
         client = await cls._get_client()
 
         try:
-            response = await client.get(
-                cls.EVENTS_URL, headers=headers, params=params
-            )
+            response = await client.get(cls.EVENTS_URL, headers=headers, params=params)
         except httpx.RequestError as exc:  # pragma: no cover - network guard
             LOGGER.exception("Failed to fetch Google Calendar events: %s", exc)
             raise HTTPException(
