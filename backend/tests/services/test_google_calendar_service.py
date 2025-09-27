@@ -61,7 +61,9 @@ class _FakeResponse:
     def __init__(self, status_code: int = 200, data: Dict[str, Any] | None = None):
         self.status_code = status_code
         self._data = data or {}
-        self.ok = 200 <= status_code < 300
+        success = 200 <= status_code < 300
+        self.ok = success
+        self.is_success = success
 
     def json(self) -> Dict[str, Any]:
         if self._data is None:

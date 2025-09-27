@@ -72,7 +72,7 @@ class GoogleCalendarService:
             ) from exc
 
         data: Dict[str, Any] = cls._safe_json(response)
-        if response.ok and data.get("access_token"):
+        if response.is_success and data.get("access_token"):
             return data["access_token"]
 
         error = data.get("error")
@@ -132,7 +132,7 @@ class GoogleCalendarService:
             ) from exc
 
         data: Dict[str, Any] = cls._safe_json(response)
-        if response.ok:
+        if response.is_success:
             return {
                 "events": data.get("items", []),
                 "nextPageToken": data.get("nextPageToken"),
