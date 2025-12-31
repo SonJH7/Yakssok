@@ -105,7 +105,7 @@ def test_google_callback_success_returns_redirect(oauth_modules, monkeypatch):
         oauth_modules.user_route.google_callback("auth-code", db=SimpleNamespace())
     )
 
-    assert redirect.status_code == 307
+    assert redirect.status_code == 302
     assert (
         redirect.headers["location"]
         == "http://frontend/auth/callback?access_token=jwt-token"
