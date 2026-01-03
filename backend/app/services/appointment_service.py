@@ -325,3 +325,16 @@ class AppointmentService:
         )
 
         return optimal_times
+
+    @staticmethod
+    async def get_my_appointments(user_id: str, db: AsyncSession) -> List[Appointments]:
+        # 내가 참여한 약속 목록 조회
+        result = await db.execute(
+            select(Appointments)
+            .join(Participations, Appointments.id == Participations.appointment_id)
+            .where(Participations.user_id == user_id)
+            .order_by(Appointments.created_at.desc())
+        )
+        appointments = result.scalars().all()
+
+        return appointments

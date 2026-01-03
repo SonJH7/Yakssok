@@ -12,7 +12,8 @@ from app.schema.appointment_schema import (
     JoinAppointmentRequest,
     ParticipationResponse,
     OptimalTimesResponse,
-    AppointmentDetailResponse
+    AppointmentDetailResponse,
+    AppointmentListResponse
 )
 from app.utils.jwt import get_current_user
 
@@ -53,6 +54,31 @@ async def create_appointment(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"약속 생성 실패: {str(e)}")
+
+
+@router.get("/", response_model=list[AppointmentListResponse])
+async def get_my_appointments(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    # 내 약속 목록 조회
+    try:
+        appointments = await AppointmentService.get_my_appointments(
+            user_id=current_user["sub"],
+            db=db
+        )
+
+        return [
+            AppointmentListResponse(
+                id=appointment.id,
+                name=appointment.name,
+                invite_link=appointment.invite_link
+            )
+            for appointment in appointments
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"약속 목록 조회 실패: {str(e)}")
 
 
 @router.get("/{invite_code}", response_model=AppointmentResponse)

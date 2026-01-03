@@ -106,5 +106,11 @@ class AppointmentDetailResponse(BaseModel):
     participants_with_data: int
     dates: List[DateAvailability]
 
+
+class AppointmentListResponse(BaseModel):
+    id: int
+    name: str
+    invite_link: str
+
     class Config:
         from_attributes = True
