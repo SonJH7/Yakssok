@@ -18,7 +18,7 @@ class ScheduleAnalyzer:
         candidate_dates: List[date],
         work_hours_start: str = DEFAULT_WORK_START,
         work_hours_end: str = DEFAULT_WORK_END,
-        timezone: str = "Asia/Seoul"
+        timezone: str = "Asia/Seoul",
     ) -> Optional[dict]:
         if not candidate_dates:
             return None
@@ -30,8 +30,12 @@ class ScheduleAnalyzer:
             )
 
             # 시간 범위 설정
-            time_min = datetime.combine(min(candidate_dates), time.min).isoformat() + "Z"
-            time_max = datetime.combine(max(candidate_dates), time.max).isoformat() + "Z"
+            time_min = (
+                datetime.combine(min(candidate_dates), time.min).isoformat() + "Z"
+            )
+            time_max = (
+                datetime.combine(max(candidate_dates), time.max).isoformat() + "Z"
+            )
 
             # Google Calendar 이벤트 조회
             calendar_response = await GoogleCalendarService.list_primary_events(
@@ -39,7 +43,7 @@ class ScheduleAnalyzer:
                 time_min=time_min,
                 time_max=time_max,
                 max_results=250,
-                time_zone=timezone
+                time_zone=timezone,
             )
 
             events = calendar_response.get("events", [])
@@ -59,19 +63,21 @@ class ScheduleAnalyzer:
                     candidate_date,
                     events_by_date.get(candidate_date, []),
                     work_start,
-                    work_end
+                    work_end,
                 )
 
                 if available_times:
-                    slots.append({
-                        "date": candidate_date.isoformat(),
-                        "available_times": available_times
-                    })
+                    slots.append(
+                        {
+                            "date": candidate_date.isoformat(),
+                            "available_times": available_times,
+                        }
+                    )
 
             return {
                 "timezone": timezone,
                 "slots": slots,
-                "calculated_at": datetime.now().isoformat()
+                "calculated_at": datetime.now().isoformat(),
             }
 
         except Exception:
@@ -79,9 +85,7 @@ class ScheduleAnalyzer:
 
     @staticmethod
     def _group_events_by_date(
-        events: List[Dict[str, Any]],
-        candidate_dates: List[date],
-        timezone: str
+        events: List[Dict[str, Any]], candidate_dates: List[date], timezone: str
     ) -> Dict[date, List[Dict[str, Any]]]:
         events_by_date = defaultdict(list)
 
@@ -96,25 +100,29 @@ class ScheduleAnalyzer:
                 current = start_date
                 while current < end_date:
                     if current in candidate_dates:
-                        events_by_date[current].append({
-                            "start": "00:00",
-                            "end": "23:59",
-                            "all_day": True
-                        })
+                        events_by_date[current].append(
+                            {"start": "00:00", "end": "23:59", "all_day": True}
+                        )
                     current += timedelta(days=1)
 
             # 시간 기반 이벤트 처리
             elif "dateTime" in event.get("start", {}):
-                start_dt = datetime.fromisoformat(event["start"]["dateTime"].replace("Z", "+00:00"))
-                end_dt = datetime.fromisoformat(event["end"]["dateTime"].replace("Z", "+00:00"))
+                start_dt = datetime.fromisoformat(
+                    event["start"]["dateTime"].replace("Z", "+00:00")
+                )
+                end_dt = datetime.fromisoformat(
+                    event["end"]["dateTime"].replace("Z", "+00:00")
+                )
 
                 event_date = start_dt.date()
                 if event_date in candidate_dates:
-                    events_by_date[event_date].append({
-                        "start": start_dt.strftime("%H:%M"),
-                        "end": end_dt.strftime("%H:%M"),
-                        "all_day": False
-                    })
+                    events_by_date[event_date].append(
+                        {
+                            "start": start_dt.strftime("%H:%M"),
+                            "end": end_dt.strftime("%H:%M"),
+                            "all_day": False,
+                        }
+                    )
 
         return events_by_date
 
@@ -123,7 +131,7 @@ class ScheduleAnalyzer:
         target_date: date,
         events: List[Dict[str, Any]],
         work_start: time,
-        work_end: time
+        work_end: time,
     ) -> List[Dict[str, str]]:
         # All-day 이벤트가 있으면 해당 날짜 전체 불가
         if any(event.get("all_day") for event in events):
@@ -138,7 +146,7 @@ class ScheduleAnalyzer:
 
         busy_periods = ScheduleAnalyzer._merge_time_periods(busy_periods)
 
-        # 가용 시간 계산 
+        # 가용 시간 계산
         available_periods = []
         current_time = work_start
 
@@ -157,17 +165,15 @@ class ScheduleAnalyzer:
         for start, end in available_periods:
             duration = ScheduleAnalyzer._time_diff_minutes(start, end)
             if duration >= ScheduleAnalyzer.MIN_SLOT_DURATION_MINUTES:
-                result.append({
-                    "start": start.strftime("%H:%M"),
-                    "end": end.strftime("%H:%M")
-                })
+                result.append(
+                    {"start": start.strftime("%H:%M"), "end": end.strftime("%H:%M")}
+                )
 
         return result
 
     @staticmethod
     def find_common_slots(
-        user_slots: List[dict],
-        min_duration_minutes: int
+        user_slots: List[dict], min_duration_minutes: int
     ) -> List[Dict[str, Any]]:
         """
         여러 사용자의 가용시간 교집합 계산
@@ -182,40 +188,43 @@ class ScheduleAnalyzer:
 
         total_participants = len(user_slots)
 
-        time_grid: Dict[str, Dict[str, Set[int]]] = defaultdict(lambda: defaultdict(set))
+        time_grid: Dict[str, Dict[str, Set[int]]] = defaultdict(
+            lambda: defaultdict(set)
+        )
 
         for user_data in user_slots:
-            user_id = user_data['user_id']
-            slots = user_data['slots']
+            user_id = user_data["user_id"]
+            slots = user_data["slots"]
 
             for slot in slots:
-                date_str = slot['date']
-                available_times = slot['available_times']
+                date_str = slot["date"]
+                available_times = slot["available_times"]
 
                 for time_range in available_times:
-                    start = ScheduleAnalyzer._parse_time(time_range['start'])
-                    end = ScheduleAnalyzer._parse_time(time_range['end'])
+                    start = ScheduleAnalyzer._parse_time(time_range["start"])
+                    end = ScheduleAnalyzer._parse_time(time_range["end"])
 
                     # 15분 단위로 그리드 채우기
                     current = start
                     while current < end:
                         time_str = current.strftime("%H:%M")
                         time_grid[date_str][time_str].add(user_id)
-                        current = ScheduleAnalyzer._add_minutes(current, ScheduleAnalyzer.GRID_INTERVAL_MINUTES)
+                        current = ScheduleAnalyzer._add_minutes(
+                            current, ScheduleAnalyzer.GRID_INTERVAL_MINUTES
+                        )
 
         # 연속된 블록 찾기 및 병합
         optimal_slots = []
         for date_str, time_slots in time_grid.items():
             merged_blocks = ScheduleAnalyzer._merge_consecutive_time_blocks(
-                date_str,
-                time_slots,
-                min_duration_minutes,
-                total_participants
+                date_str, time_slots, min_duration_minutes, total_participants
             )
             optimal_slots.extend(merged_blocks)
 
         # 정렬: 참여 인원 DESC, 시간 길이 DESC
-        optimal_slots.sort(key=lambda x: (-x['participant_count'], -x['duration_minutes']))
+        optimal_slots.sort(
+            key=lambda x: (-x["participant_count"], -x["duration_minutes"])
+        )
 
         return optimal_slots
 
@@ -224,7 +233,7 @@ class ScheduleAnalyzer:
         date_str: str,
         time_slots: Dict[str, Set[int]],
         min_duration_minutes: int,
-        total_participants: int
+        total_participants: int,
     ) -> List[Dict[str, Any]]:
         if not time_slots:
             return []
@@ -252,13 +261,23 @@ class ScheduleAnalyzer:
             assert current_participants is not None
 
             time_diff = ScheduleAnalyzer._time_diff_minutes(prev_time, current_time)
-            if time_diff == ScheduleAnalyzer.GRID_INTERVAL_MINUTES and participants == current_participants:
+            if (
+                time_diff == ScheduleAnalyzer.GRID_INTERVAL_MINUTES
+                and participants == current_participants
+            ):
                 prev_time = current_time
             else:
-                end_time = ScheduleAnalyzer._add_minutes(prev_time, ScheduleAnalyzer.GRID_INTERVAL_MINUTES)
+                end_time = ScheduleAnalyzer._add_minutes(
+                    prev_time, ScheduleAnalyzer.GRID_INTERVAL_MINUTES
+                )
                 ScheduleAnalyzer._add_block_if_valid(
-                    results, date_str, current_start, end_time.strftime("%H:%M"),
-                    current_participants, total_participants, min_duration_minutes
+                    results,
+                    date_str,
+                    current_start,
+                    end_time.strftime("%H:%M"),
+                    current_participants,
+                    total_participants,
+                    min_duration_minutes,
                 )
 
                 current_start = time_str
@@ -268,10 +287,17 @@ class ScheduleAnalyzer:
         # 마지막 블록 처리
         if current_start is not None and prev_time is not None:
             assert current_participants is not None
-            end_time = ScheduleAnalyzer._add_minutes(prev_time, ScheduleAnalyzer.GRID_INTERVAL_MINUTES)
+            end_time = ScheduleAnalyzer._add_minutes(
+                prev_time, ScheduleAnalyzer.GRID_INTERVAL_MINUTES
+            )
             ScheduleAnalyzer._add_block_if_valid(
-                results, date_str, current_start, end_time.strftime("%H:%M"),
-                current_participants, total_participants, min_duration_minutes
+                results,
+                date_str,
+                current_start,
+                end_time.strftime("%H:%M"),
+                current_participants,
+                total_participants,
+                min_duration_minutes,
             )
 
         return results
@@ -284,7 +310,7 @@ class ScheduleAnalyzer:
         end_str: str,
         participants: Set[int],
         total_participants: int,
-        min_duration_minutes: int
+        min_duration_minutes: int,
     ):
         start = ScheduleAnalyzer._parse_time(start_str)
         end = ScheduleAnalyzer._parse_time(end_str)
@@ -292,21 +318,24 @@ class ScheduleAnalyzer:
 
         if duration >= min_duration_minutes:
             participant_count = len(participants)
-            results.append({
-                "date": date_str,
-                "start_time": start_str,
-                "end_time": end_str,
-                "duration_minutes": duration,
-                "participant_count": participant_count,
-                "total_participants": total_participants,
-                "participant_ids": sorted(list(participants)),
-                "availability_percentage": round((participant_count / total_participants) * 100, 2)
-            })
-
+            results.append(
+                {
+                    "date": date_str,
+                    "start_time": start_str,
+                    "end_time": end_str,
+                    "duration_minutes": duration,
+                    "participant_count": participant_count,
+                    "total_participants": total_participants,
+                    "participant_ids": sorted(list(participants)),
+                    "availability_percentage": round(
+                        (participant_count / total_participants) * 100, 2
+                    ),
+                }
+            )
 
     @staticmethod
     def _parse_time(time_str: str) -> time:
-        #시간 문자열을 time 객체로 파싱
+        # 시간 문자열을 time 객체로 파싱
         try:
             return datetime.strptime(time_str, "%H:%M").time()
         except ValueError:
@@ -314,7 +343,7 @@ class ScheduleAnalyzer:
 
     @staticmethod
     def _time_diff_minutes(start: time, end: time) -> int:
-        #두 시간의 차이를 분 단위로 계산
+        # 두 시간의 차이를 분 단위로 계산
         start_minutes = start.hour * 60 + start.minute
         end_minutes = end.hour * 60 + end.minute
         return end_minutes - start_minutes
@@ -333,7 +362,7 @@ class ScheduleAnalyzer:
 
     @staticmethod
     def _merge_time_periods(periods: List[tuple]) -> List[tuple]:
-        #겹치는 시간 구간들을 병합
+        # 겹치는 시간 구간들을 병합
         if not periods:
             return []
 

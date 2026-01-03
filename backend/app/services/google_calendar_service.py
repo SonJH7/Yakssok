@@ -247,7 +247,7 @@ class GoogleCalendarService:
                 headers=headers,
                 json=event_data,
             )
-        except httpx.RequestError as exc: 
+        except httpx.RequestError as exc:
             LOGGER.exception("Failed to create Google Calendar event: %s", exc)
             raise HTTPException(
                 status_code=500, detail="구글 캘린더 이벤트 생성 요청에 실패했습니다."
@@ -281,7 +281,9 @@ class GoogleCalendarService:
         if response.status_code == 403 or cls._matches_insufficient_scope(error_tokens):
             raise HTTPException(status_code=403, detail="insufficient_scope")
 
-        raise HTTPException(status_code=500, detail="구글 캘린더 이벤트 생성에 실패했습니다.")
+        raise HTTPException(
+            status_code=500, detail="구글 캘린더 이벤트 생성에 실패했습니다."
+        )
 
     @classmethod
     async def delete_event(
@@ -329,4 +331,6 @@ class GoogleCalendarService:
         if response.status_code == 403 or cls._matches_insufficient_scope(error_tokens):
             raise HTTPException(status_code=403, detail="insufficient_scope")
 
-        raise HTTPException(status_code=500, detail="구글 캘린더 이벤트 삭제에 실패했습니다.")
+        raise HTTPException(
+            status_code=500, detail="구글 캘린더 이벤트 삭제에 실패했습니다."
+        )

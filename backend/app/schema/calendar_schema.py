@@ -3,7 +3,9 @@ from typing import Optional
 
 
 class EventDateTime(BaseModel):
-    dateTime: str = Field(..., description="RFC3339 format timestamp (e.g., 2026-01-15T10:00:00+09:00)")
+    dateTime: str = Field(
+        ..., description="RFC3339 format timestamp (e.g., 2026-01-15T10:00:00+09:00)"
+    )
     timeZone: str = Field(default="Asia/Seoul", description="IANA timezone")
 
 
@@ -24,12 +26,12 @@ class EventCreateRequest(BaseModel):
                 "description": "주간 팀 미팅",
                 "start": {
                     "dateTime": "2026-01-15T10:00:00+09:00",
-                    "timeZone": "Asia/Seoul"
+                    "timeZone": "Asia/Seoul",
                 },
                 "end": {
                     "dateTime": "2026-01-15T11:00:00+09:00",
-                    "timeZone": "Asia/Seoul"
-                }
+                    "timeZone": "Asia/Seoul",
+                },
             }
         }
 

@@ -27,7 +27,7 @@ def verify_token(token: str):
         return None
 
 
-def get_current_user(token = Depends(security)):
+def get_current_user(token=Depends(security)):
     # JWT 토큰에서 현재 사용자 정보 추출
     credentials_exception = HTTPException(
         status_code=401,

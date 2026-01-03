@@ -14,8 +14,7 @@ class GoogleOAuthService:
     def generate_auth_url(force_prompt_consent: bool = False):
         # Google OAuth 인증 URL 생성
         scope = (
-            "openid email profile "
-            "https://www.googleapis.com/auth/calendar.events"
+            "openid email profile " "https://www.googleapis.com/auth/calendar.events"
         )
         params = {
             "client_id": GOOGLE_CLIENT_ID,
