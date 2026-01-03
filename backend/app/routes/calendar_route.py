@@ -172,3 +172,84 @@ async def add_events(
         raise
 
     return created_event
+
+
+@router.delete("/events/{event_id}")
+async def delete_event(
+    event_id: str,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+):
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="인증 토큰이 필요합니다.")
+
+    payload = verify_token(credentials.credentials)
+    user_id = payload.get("sub") if payload else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+
+    user = await UserService.get_user_by_google_id(user_id, db)
+    if not user or not getattr(user, "google_refresh_token", None):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "code": "calendar_scope_missing",
+                "reauthUrl": REAUTH_URL,
+            },
+        )
+
+    try:
+        access_token = await GoogleCalendarService.refresh_access_token(
+            user.google_refresh_token
+        )
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "code": "google_reauth_required",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        raise
+
+    try:
+        deleted_event = await GoogleCalendarService.delete_event(
+            access_token,
+            event_id,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "code": "google_reauth_required",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        if exc.status_code == 400 and exc.detail == "calendar_scope_missing":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "code": "calendar_scope_missing",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        if exc.status_code == 403:
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "code": "insufficient_scope",
+                    "reauthUrl": REAUTH_URL,
+                },
+            )
+        if exc.status_code == 404:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "code": "event_not_found",
+                },
+            )
+        raise
+
+    return deleted_event
