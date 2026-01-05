@@ -21,8 +21,12 @@ class Appointments(Base):
     name = Column(String(255), nullable=False)
     creator_id = Column(String(255))
     max_participants = Column(Integer, nullable=False)
-    status = Column(Enum("VOTING", "CONFIRMED", "CANCELED"), nullable=False)
+    status = Column(Enum("VOTING", "CONFIRMED"), nullable=False)
     invite_link = Column(String(255), unique=True)
+    confirmed_date = Column(Date, nullable=True)
+    confirmed_start_time = Column(String(5), nullable=True)
+    confirmed_end_time = Column(String(5), nullable=True)
+    confirmed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
 
     appointment_dates = relationship(
@@ -37,7 +41,9 @@ class AppointmentDates(Base):
     __tablename__ = "appointment_dates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False)
+    appointment_id = Column(
+        Integer, ForeignKey("appointments.id", ondelete="CASCADE"), nullable=False
+    )
     candidate_date = Column(Date, nullable=False)
     __table_args__ = (UniqueConstraint("appointment_id", "candidate_date"),)
 

@@ -15,6 +15,8 @@ from app.schema.appointment_schema import (
     AppointmentDetailResponse,
     AppointmentListResponse,
     SyncMySchedulesResponse,
+    ConfirmAppointmentRequest,
+    ConfirmAppointmentResponse,
 )
 from app.utils.jwt import get_current_user
 
@@ -246,3 +248,37 @@ async def sync_my_schedules(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"일정 동기화 실패: {str(e)}")
+
+
+@router.post("/{invite_code}/confirm", response_model=ConfirmAppointmentResponse)
+async def confirm_appointment(
+    invite_code: str,
+    request: ConfirmAppointmentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    # 약속 확정
+    try:
+        appointment = await AppointmentService.confirm_appointment(
+            invite_code=invite_code,
+            confirmed_date=request.confirmed_date,
+            confirmed_start_time=request.confirmed_start_time,
+            confirmed_end_time=request.confirmed_end_time,
+            user_id=current_user["sub"],
+            db=db,
+        )
+
+        return ConfirmAppointmentResponse(
+            id=appointment.id,
+            name=appointment.name,
+            status=appointment.status,
+            confirmed_date=appointment.confirmed_date,
+            confirmed_start_time=appointment.confirmed_start_time,
+            confirmed_end_time=appointment.confirmed_end_time,
+            confirmed_at=appointment.confirmed_at,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"약속 확정 실패: {str(e)}")

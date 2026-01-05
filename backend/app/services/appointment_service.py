@@ -344,7 +344,7 @@ class AppointmentService:
     def _filter_slots_by_time_range(
         slots: List[dict], time_range_start: str = None, time_range_end: str = None
     ) -> List[dict]:
-        #저장된 가용 시간 슬롯을 시간대 필터로 제한
+        # 저장된 가용 시간 슬롯을 시간대 필터로 제한
         if not time_range_start and not time_range_end:
             return slots
 
@@ -389,6 +389,45 @@ class AppointmentService:
                 )
 
         return filtered_slots
+
+    @staticmethod
+    async def confirm_appointment(
+        invite_code: str,
+        confirmed_date: str,
+        confirmed_start_time: str,
+        confirmed_end_time: str,
+        user_id: str,
+        db: AsyncSession,
+    ) -> Appointments:
+        from datetime import datetime
+
+        # 약속 조회
+        appointment = await AppointmentService.get_appointment_by_invite_code(
+            invite_code, db
+        )
+        if not appointment:
+            raise ValueError("존재하지 않는 약속입니다")
+
+        # 생성자 확인
+        if appointment.creator_id != user_id:
+            raise ValueError("약속 생성자만 확정할 수 있습니다")
+
+        # 이미 확정된 약속인지 확인
+        if appointment.status == "CONFIRMED":
+            raise ValueError("이미 확정된 약속입니다")
+        
+        
+        # 약속 확정
+        appointment.status = "CONFIRMED"
+        appointment.confirmed_date = confirmed_date
+        appointment.confirmed_start_time = confirmed_start_time
+        appointment.confirmed_end_time = confirmed_end_time
+        appointment.confirmed_at = datetime.now()
+
+        await db.commit()
+        await db.refresh(appointment)
+
+        return appointment
 
     @staticmethod
     async def get_my_appointments(user_id: str, db: AsyncSession) -> List[Appointments]:

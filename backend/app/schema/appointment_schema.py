@@ -120,3 +120,30 @@ class SyncMySchedulesResponse(BaseModel):
     total_appointments: int
     updated_count: int
     failed_count: int
+
+
+class ConfirmAppointmentRequest(BaseModel):
+    confirmed_date: date
+    confirmed_start_time: str
+    confirmed_end_time: str
+
+    @validator("confirmed_start_time", "confirmed_end_time")
+    def validate_time_format(cls, v):
+        try:
+            datetime.strptime(v, "%H:%M")
+        except ValueError:
+            raise ValueError("시간 형식은 HH:MM이어야 합니다 (예: 09:00)")
+        return v
+
+
+class ConfirmAppointmentResponse(BaseModel):
+    id: int
+    name: str
+    status: str
+    confirmed_date: Optional[date]
+    confirmed_start_time: Optional[str]
+    confirmed_end_time: Optional[str]
+    confirmed_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
