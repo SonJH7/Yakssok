@@ -286,6 +286,67 @@ class GoogleCalendarService:
         )
 
     @classmethod
+    async def update_event(
+        cls,
+        access_token: str,
+        event_id: str,
+        event_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        url = f"{cls.EVENTS_URL}/{event_id}"
+
+        client = await cls._get_client()
+
+        try:
+            response = await client.patch(
+                url,
+                headers=headers,
+                json=event_data,
+            )
+        except httpx.RequestError as exc:  # pragma: no cover - network guard
+            LOGGER.exception("Failed to update Google Calendar event: %s", exc)
+            raise HTTPException(
+                status_code=500, detail="구글 캘린더 이벤트 수정 요청에 실패했습니다."
+            ) from exc
+
+        data: Dict[str, Any] = cls._safe_json(response)
+        if response.is_success:
+            return {
+                "id": data.get("id"),
+                "summary": data.get("summary"),
+                "htmlLink": data.get("htmlLink"),
+                "status": data.get("status"),
+            }
+
+        error_info = cls._extract_calendar_error(data)
+        error_tokens = cls._extract_calendar_error_tokens(data)
+        LOGGER.error(
+            "Google Calendar update event error (status=%s, error=%s)",
+            response.status_code,
+            error_info,
+        )
+
+        if response.status_code == 401:
+            raise HTTPException(status_code=401, detail="google_reauth_required")
+        if response.status_code == 404:
+            raise HTTPException(status_code=404, detail="event_not_found")
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="rate_limited")
+
+        if cls._matches_scope_missing(error_tokens):
+            raise HTTPException(status_code=400, detail="calendar_scope_missing")
+
+        if response.status_code == 403 or cls._matches_insufficient_scope(error_tokens):
+            raise HTTPException(status_code=403, detail="insufficient_scope")
+
+        raise HTTPException(
+            status_code=500, detail="구글 캘린더 이벤트 수정에 실패했습니다."
+        )
+
+    @classmethod
     async def delete_event(
         cls,
         access_token: str,
