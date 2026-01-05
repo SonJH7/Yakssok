@@ -4,42 +4,14 @@ body, html, #root {
   width: 100%;
   height: 100%;
   font-family: 'Pretendard', sans-serif;
-  background-color: #EAEEE0;
+  background-color: #E9E9E3;
 }
 
 .appLayout {
-  --sidebar-width: 120px;
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  min-height: 100vh;
-  transition: grid-template-columns 0.45s ease;
-}
-
-.appLayout.sidebar-open {
-  --sidebar-width: 360px;
+  display: flex;
+  height: 100vh;
 }
 
 .content {
-  width: 100%;
-  min-width: 0;
-  transition: margin 0.45s ease, padding 0.45s ease;
-}
-
-.appLayout.sidebar-animating .content {
-  opacity: 0.65;
-}
-
-.page-transition {
-  opacity: 0;
-  animation: fadeIn 0.55s ease forwards;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  flex: 1;
 }

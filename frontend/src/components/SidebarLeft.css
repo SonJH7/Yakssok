@@ -71,13 +71,11 @@
   font-display: swap;
 }
 
-
 /* --- 기본 설정 초기화 --- */
 button:focus {
   outline: none;
   box-shadow: none;
 }
-
 
 /* --- 사이드바 컨테이너 --- */
 .sidebarLeft {
@@ -91,7 +89,10 @@ button:focus {
   display: flex;
   flex-direction: column;
 
-  background: #e9ede2;
+  background: #e9e9e3;
+
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 열린 상태 */
@@ -106,14 +107,13 @@ button:focus {
   padding: 30px;
 }
 
-
 /* --- 로고, 버튼 --- */
 .sidebarLeftLogo {
   position: absolute;
   top: 38px;
   left: 33px;
 
-  width: 56px;
+  width: 55px;
   height: 55px;
 
   display: flex;
@@ -138,22 +138,19 @@ button:focus {
   pointer-events: none;
 }
 
-.sidebarLeftLogo:not(.open):hover .sidebarButton {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sidebarLeftLogo:not(.open):hover .logoIcon {
+.sidebarLeftLogo:hover .logoIcon {
   opacity: 0;
   pointer-events: none;
 }
 
-.sidebarLeftLogo.open .sidebarButton {
+.sidebarLeftLogo:not(.open).hovered .openBtn {
   opacity: 1;
   pointer-events: auto;
+}
 
-  top: 0;
-  left: 250px;
+.sidebarLeftLogo.open.hovered .closeBtn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 
@@ -173,7 +170,7 @@ button:focus {
 
   background: #000;
   border: none;
-  border-radius: 15px;
+  border-radius: 13px;
 
   cursor: pointer;
 }
@@ -212,12 +209,23 @@ button:focus {
   line-height: 24px;
 
   color: #c4c5b7;
+
+  overflow: hidden;
+
+  opacity: 1;
+  transition: max-height 0.35s ease, opacity 0.2s ease;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebarLeft.closed .buttonText {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
 }
-
 
 /* --- 페이지 이동 버튼 --- */
 .iconRow {
@@ -230,10 +238,18 @@ button:focus {
   align-items: center;
   justify-content: center;
   gap: 52px;
+
+  overflow: hidden;
+
+  opacity: 1;
+  transition: max-height 0.35s ease, opacity 0.2s ease;
 }
 
 .sidebarLeft.open .iconRow {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .iconButton {
@@ -257,7 +273,6 @@ button:focus {
   white-space: nowrap;
 }
 
-
 /* --- 약속 달력 --- */
 .calendar {
   margin: 25px 0;
@@ -266,12 +281,20 @@ button:focus {
   width: 300px;
   box-sizing: border-box;
 
-  background: #f6faed;
+  background: #f7f7f0;
   border-radius: 15px;
+
+  overflow: hidden;
+
+  opacity: 1;
+  transition: max-height 0.35s ease, opacity 0.2s ease;
 }
 
 .sidebarLeft.closed .calendar {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .calendarHeader {
@@ -359,22 +382,29 @@ button:focus {
   border-radius: 4px;
 }
 
-
 /* --- 약속 목록 --- */
 .appointments {
   margin: 25px 0;
   padding: 20px;
 
-  width: 100%;
+  width: 300px;
   height: 140px;
   box-sizing: border-box;
 
-  background: #f6faed;
+  background: #f7f7f0;
   border-radius: 15px;
+
+  overflow: hidden;
+
+  opacity: 1;
+  transition: max-height 0.35s ease, opacity 0.2s ease;
 }
 
 .sidebarLeft.closed .appointments {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .appointmentsBox {
@@ -415,8 +445,11 @@ button:focus {
   font-weight: 500;
   font-size: 13px;
   color: #8aa24b;
-}
 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* --- 프로필 이미지 --- */
 .profile {

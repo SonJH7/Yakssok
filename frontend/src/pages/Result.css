@@ -66,14 +66,14 @@
   display: flex;
   width: 100vw;
   height: 100vh;
-  background-color: #e9ede2;
+  background-color: #E9E9E3;
   overflow: hidden;
 }
 
 /* --- 메인 컨테이너 --- */
 .resultContainer {
   flex: 1;
-  background-color: #fafff2;
+  background-color: #FDFDF8;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -196,7 +196,7 @@
 }
 
 .setInput {
-  background-color: #e9ede2;
+  background-color: #E9E9E3;
   color: #292929;
   width: 60px;
   height: 60px;
@@ -257,7 +257,7 @@ input[type="number"]::-webkit-inner-spin-button {
   width: 900px;
   padding: 10px 30px;
   border-radius: 20px;
-  background: #e9ede2;
+  background: #E9E9E3;
   display: flex;
   flex-direction: row;
   justify-content: center;

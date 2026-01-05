@@ -162,11 +162,21 @@ const SidebarLeft = ({ events = [] }) => {
         <div
           className={`sidebarLeftLogo ${isOpen ? "open" : ""} 
           ${isLogoHovered ? "hovered" : ""}`}
-          onMouseEnter={() => !isOpen && setIsLogoHovered(true)}
+          onMouseEnter={() => setIsLogoHovered(true)}
           onMouseLeave={() => setIsLogoHovered(false)}
         >
-          <button className="sidebarButton" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <CloseButton /> : <OpenButton />}
+          <button
+            className="sidebarButton openBtn"
+            onClick={() => setIsOpen(true)}
+          >
+            <OpenButton />
+          </button>
+
+          <button
+            className="sidebarButton closeBtn"
+            onClick={() => setIsOpen(false)}
+          >
+            <CloseButton />
           </button>
           <LogoIcon className="logoIcon" />
         </div>
@@ -178,7 +188,9 @@ const SidebarLeft = ({ events = [] }) => {
               <NewButton />
             </div>
           ) : (
-            <div className={`buttonIconClosed ${isCreatePage ? "Rotated" : ""}`}>
+            <div
+              className={`buttonIconClosed ${isCreatePage ? "Rotated" : ""}`}
+            >
               <NewButtonClosed />
             </div>
           )}

@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import SidebarLeft from "./components/SidebarLeft";
@@ -13,14 +13,12 @@ import { API_BASE_URL } from "./config/api";
 export default function AppLayout() {
   // 약속 데이터 목록 상태
   const [sidebarEvents, setSidebarEvents] = useState([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 에러 메시지 상태
   const [error, setError] = useState("");
 
   // 로그인 토큰
   const token = useMemo(() => localStorage.getItem("access_token"), []);
-  const location = useLocation();
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -60,18 +58,11 @@ export default function AppLayout() {
     fetchAppointments();
   }, [token]);
 
-  const layoutClass = `appLayout ${isSidebarOpen ? "sidebar-open" : "sidebar-closed"}`;
 
   return (
-    <div className={layoutClass}>
-      <SidebarLeft
-        events={sidebarEvents}
-        isOpen={isSidebarOpen}
-        onToggle={setIsSidebarOpen}
-      />
-      <div key={location.pathname} className="content page-transition">
-        <Outlet />
-      </div>
+    <div className="appLayout">
+      <SidebarLeft events={sidebarEvents} />
+      <Outlet className="content" />
     </div>
   );
 }
