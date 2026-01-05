@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 
 
@@ -7,6 +7,22 @@ class EventDateTime(BaseModel):
         ..., description="RFC3339 format timestamp (e.g., 2026-01-15T10:00:00+09:00)"
     )
     timeZone: str = Field(default="Asia/Seoul", description="IANA timezone")
+
+
+class EventDateInput(BaseModel):
+    date: Optional[str] = Field(None, description="All-day date (YYYY-MM-DD)")
+    dateTime: Optional[str] = Field(
+        None, description="RFC3339 format timestamp (e.g., 2026-01-15T10:00:00+09:00)"
+    )
+    timeZone: Optional[str] = Field(None, description="IANA timezone")
+
+    @model_validator(mode="after")
+    def validate_date_or_datetime(self):
+        if self.date and self.dateTime:
+            raise ValueError("Provide either date or dateTime, not both.")
+        if not self.date and not self.dateTime:
+            raise ValueError("Either date or dateTime is required.")
+        return self
 
 
 class Attendee(BaseModel):
@@ -39,8 +55,17 @@ class EventCreateRequest(BaseModel):
 class EventUpdateRequest(BaseModel):
     summary: Optional[str] = Field(None, description="Event title")
     description: Optional[str] = Field(None, description="Event description")
-    start: Optional[EventDateTime] = Field(None, description="Event start time")
-    end: Optional[EventDateTime] = Field(None, description="Event end time")
+    start: Optional[EventDateInput] = Field(None, description="Event start time")
+    end: Optional[EventDateInput] = Field(None, description="Event end time")
+
+    @model_validator(mode="after")
+    def validate_start_end_type(self):
+        if self.start and self.end:
+            if bool(self.start.date) != bool(self.end.date):
+                raise ValueError(
+                    "start and end must use the same type (date or dateTime)."
+                )
+        return self
 
     class Config:
         json_schema_extra = {
