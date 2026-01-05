@@ -36,6 +36,29 @@ class EventCreateRequest(BaseModel):
         }
 
 
+class EventUpdateRequest(BaseModel):
+    summary: Optional[str] = Field(None, description="Event title")
+    description: Optional[str] = Field(None, description="Event description")
+    start: Optional[EventDateTime] = Field(None, description="Event start time")
+    end: Optional[EventDateTime] = Field(None, description="Event end time")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "summary": "Updated meeting title",
+                "description": "Updated meeting description",
+                "start": {
+                    "dateTime": "2026-01-15T11:00:00+09:00",
+                    "timeZone": "Asia/Seoul",
+                },
+                "end": {
+                    "dateTime": "2026-01-15T12:00:00+09:00",
+                    "timeZone": "Asia/Seoul",
+                },
+            }
+        }
+
+
 class EventCreateResponse(BaseModel):
     id: str
     summary: str
