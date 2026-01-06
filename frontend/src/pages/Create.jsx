@@ -52,6 +52,22 @@ const Create = () => {
         return () => observer.disconnect();
     }, [isFormValid]);
 
+    const handleNumberChange = (e) => {
+        let num = Number(e.target.value);
+
+        if (num > 30) {
+            setNumber("30"); 
+            alert("약속에는 최대 30명만 참여할 수 있어요. "); 
+            return; 
+        }
+        else if (num < 1 && num !== 0) {
+            setNumber("1")
+            alert("참여 인원수는 1명 이상이어야 해요. "); 
+            return; 
+        }
+        setNumber(e.target.value); 
+    }
+
     const getNextTarget = () => {
         if (title.trim().length === 0) return titleRef.current;
         if (Number(number) <= 0) return numberRef.current;
@@ -109,7 +125,7 @@ const Create = () => {
             body: JSON.stringify(payload),
             });
 
-            if (res.status == 401 || res.status == 403) {
+            if (res.status === 401 || res.status === 403) {
                 localStorage.removeItem("access_token");
                 alert("로그인 정보가 만료되었어요. 다시 로그인해주세요.");
                 navigate("/");
@@ -166,7 +182,7 @@ const Create = () => {
                                 min="0"
                                 max="30"
                                 value={number}
-                                onChange={(e) => setNumber(e.target.value)}
+                                onChange={handleNumberChange}
                             />
                             <span className='num-index-2'>명</span>
                         </div>
