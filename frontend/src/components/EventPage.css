@@ -275,3 +275,10 @@
   background-color: #E9E9E3;
   color: #555;
 }
+
+.btn:disabled {
+  background-color: #C4C5B7;
+  color: #FFFFFF;
+  cursor: not-allowed;
+  opacity: 0.7;
+}

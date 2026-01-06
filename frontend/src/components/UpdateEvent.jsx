@@ -21,6 +21,10 @@ const UpdateEvent = ({ event, onSave, onCancel }) => {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
 
+  const [initialTitle, setInitialTitle] = useState('');
+  const [initialStartTime, setInitialStartTime] = useState('');
+  const [initialEndTime, setInitialEndTime] = useState('');
+
   const formatTime = (dateObj) => {
     if (!dateObj) return '';
     const hh = String(dateObj.getHours()).padStart(2, '0');
@@ -29,48 +33,84 @@ const UpdateEvent = ({ event, onSave, onCancel }) => {
   };
 
   useEffect(() => {
-    if (event) {
-      setTitle(event.title);
-      const sDate = new Date(event.start);
-      setStartTime(formatTime(sDate));
+  if (!event) return;
 
-      if (event.end) {
-        setEndTime(formatTime(new Date(event.end)));
-      } else {
-        const eDate = new Date(sDate.getTime() + 60 * 60 * 1000); 
-        setEndTime(formatTime(eDate));
-      }
-    }
-  }, [event]);
+  const sDate = new Date(event.start);
+  const sTime = formatTime(sDate);
+
+  let eTime;
+  if (event.end) {
+    eTime = formatTime(new Date(event.end));
+  } else {
+    const eDate = new Date(sDate.getTime() + 60 * 60 * 1000);
+    eTime = formatTime(eDate);
+  }
+
+  setTitle(event.title);
+  setStartTime(sTime);
+  setEndTime(eTime);
+
+  setInitialTitle(event.title);
+  setInitialStartTime(sTime);
+  setInitialEndTime(eTime);
+}, [event]);
+
+  const hasAnyInput =
+  title.trim() !== initialTitle ||
+  startTime !== initialStartTime ||
+  endTime !== initialEndTime
 
   const handleSave = () => {
-    if (!title.trim()) {
-      alert('약속 이름을 입력해주세요!');
+    if (!hasAnyInput) {
       return;
     }
 
-    const baseDate = new Date(event.start);
-    const year = baseDate.getFullYear();
-    const month = baseDate.getMonth();
-    const day = baseDate.getDate();
+    const updatedEvent = { ...event };
+    const updatePayload = {};
 
-    const [startH, startM] = startTime.split(':').map(Number);
-    const newStartDate = new Date(year, month, day, startH, startM);
-
-    const [endH, endM] = endTime.split(':').map(Number);
-    const newEndDate = new Date(year, month, day, endH, endM);
-
-    if (newEndDate < newStartDate) {
-      alert("종료 시간이 시작 시간보다 빠를 수 없습니다.");
-      return;
+    if (title.trim()) {
+      const trimmed = title.trim();
+      updatedEvent.title = trimmed;
+      updatePayload.summary = trimmed;
     }
 
-    onSave({
-      ...event, 
-      title,
-      start: newStartDate,
-      end: newEndDate,
-    });
+    const hasBothTimes = Boolean(startTime && endTime);
+
+    if (startTime || endTime) {
+      if (!hasBothTimes) {
+        alert('시작 시간과 종료 시간을 모두 입력해주세요.');
+        return;
+      }
+
+      const baseDate = new Date(event.start);
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
+      const day = baseDate.getDate();
+
+      const [startH, startM] = startTime.split(':').map(Number);
+      const newStartDate = new Date(year, month, day, startH, startM);
+
+      const [endH, endM] = endTime.split(':').map(Number);
+      const newEndDate = new Date(year, month, day, endH, endM);
+
+      if (newEndDate < newStartDate) {
+        alert("종료 시간이 시작 시간보다 빠를 수 없습니다.");
+        return;
+      }
+
+      updatedEvent.start = newStartDate;
+      updatedEvent.end = newEndDate;
+      updatePayload.start = {
+        dateTime: newStartDate.toISOString(),
+        timeZone: 'Asia/Seoul',
+      };
+      updatePayload.end = {
+        dateTime: newEndDate.toISOString(),
+        timeZone: 'Asia/Seoul',
+      };
+    }
+
+    onSave(updatedEvent, updatePayload);
   };
 
   const displayDate = event ? new Date(event.start) : null;
@@ -135,7 +175,13 @@ const UpdateEvent = ({ event, onSave, onCancel }) => {
         </div>
 
         <div className="button-group">
-          <button className="btn primary" onClick={handleSave}>수정하기</button>
+          <button
+            className="btn primary"
+            onClick={handleSave}
+            disabled={!hasAnyInput}
+          >
+            수정하기
+          </button>
           <button className="btn secondary" onClick={onCancel}>뒤로가기</button>
         </div>
       </div>

@@ -24,6 +24,7 @@ const Invited = () => {
   const [allEvents, setAllEvents] = useState(initialEventsWithId);
   const [pendingAddEvents, setPendingAddEvents] = useState([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState([]);
+  const [pendingUpdateEvents, setPendingUpdateEvents] = useState([]);
 
   const [partyName, setPartyName] = useState("");
   const [candidateDates, setCandidateDates] = useState([]);
@@ -429,6 +430,9 @@ const Invited = () => {
     setAllEvents(updatedEvents);
     setPendingAddEvents(updatedPendingAdds);
     setPendingDeleteIds(newPendingDeleteIds);
+    setPendingUpdateEvents((prev) =>
+      prev.filter((item) => !selectedDeleteIds.includes(item.id))
+    );
     setViewMode('list');
     setSelectedDeleteIds([]);
   };
@@ -440,7 +444,7 @@ const Invited = () => {
     setViewMode('list');
   };
 
-  const updateEvent = (updatedEvent) => {
+  const updateEvent = (updatedEvent, updatePayload = {}) => {
     const isNewlyAdded = pendingAddEvents.some((event) => event.id === updatedEvent.id);
 
     if (isNewlyAdded) {
@@ -454,16 +458,17 @@ const Invited = () => {
       return;
     }
 
-    const replacementEvent = { ...updatedEvent, id: `temp-${Date.now()}` };
+    setPendingUpdateEvents((prev) => {
+      const remaining = prev.filter((item) => item.id !== updatedEvent.id);
+      const hasPayload = updatePayload && Object.keys(updatePayload).length > 0;
 
-    setPendingDeleteIds((prev) =>
-      prev.includes(updatedEvent.id) ? prev : [...prev, updatedEvent.id]
-    );
-
-    setPendingAddEvents((prev) => [...prev, replacementEvent]);
+      return hasPayload
+        ? [...remaining, { id: updatedEvent.id, payload: updatePayload }]
+        : remaining;
+    });
 
     setAllEvents((prev) =>
-      prev.map((event) => (event.id === updatedEvent.id ? replacementEvent : event))
+      prev.map((event) => (event.id === updatedEvent.id ? updatedEvent : event))
     );
     setViewMode('list');
   };
@@ -476,12 +481,32 @@ const Invited = () => {
       return;
     }
 
-    if (pendingAddEvents.length === 0 && pendingDeleteIds.length === 0) {
-      alert('추가하거나 삭제한 일정은 없어요.');
+    if (
+      pendingAddEvents.length === 0 &&
+      pendingDeleteIds.length === 0 &&
+      pendingUpdateEvents.length === 0
+    ) {
+      alert('추가, 삭제하거나 수정한 일정은 없어요.');
       return;
     }
 
     try {
+      for (const update of pendingUpdateEvents) {
+        const res = await fetch(`${API_BASE_URL}/calendar/events/${update.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(update.payload),
+        });
+
+        if (!res.ok) {
+          const message = (await res.json())?.detail || '일정 수정에 실패했습니다.';
+          throw new Error(message);
+        }
+      }
+
       for (const deleteId of pendingDeleteIds) {
         const res = await fetch(`${API_BASE_URL}/calendar/events/${deleteId}`, {
           method: 'DELETE',
@@ -528,6 +553,7 @@ const Invited = () => {
       await fetchUserEvents();
       setPendingAddEvents([]);
       setPendingDeleteIds([]);
+      setPendingUpdateEvents([]);
       alert('구글 캘린더와 동기화되었어요. 잠시만 기다려주세요.');
     } catch (error) {
       console.error(error);

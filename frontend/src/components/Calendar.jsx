@@ -18,6 +18,7 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
   const [reauthUrl, setReauthUrl] = useState(null);
   const [headerTransitionClass, setHeaderTransitionClass] = useState('');
   const [bodyTransitionClass, setBodyTransitionClass] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const normalizeEvents = useCallback(
     (items = []) =>
@@ -128,6 +129,45 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
     },
     [normalizeEvents]
   );
+
+  const handleSyncSchedules = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+
+    if (!token) {
+      alert('로그인이 필요해요.');
+      return;
+    }
+
+    setIsSyncing(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/appointments/sync-my-schedules`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = data?.detail || '약속 동기화에 실패했어요.';
+        alert(message);
+        return;
+      }
+
+      //alert('모든 약속이 최신 일정으로 동기화되었어요');
+
+      if (dateRange) {
+        await fetchCalendarEvents(dateRange);
+      }
+    } catch (error) {
+      console.error('Failed to sync schedules', error);
+      alert('약속 동기화 중 오류가 발생했어요.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [dateRange, fetchCalendarEvents]);
 
   // 초기화: 오늘 날짜로 이동
   useEffect(() => {
@@ -328,6 +368,22 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
           <div className="custom-title-container">
             <span className="month">{month}</span>
             <span className="year">{year}</span>
+            <button
+                type="button"
+                className="sync-button"
+                onClick={handleSyncSchedules}
+                disabled={isSyncing}
+              >
+                <span className="sync-label">{isSyncing ? '동기화 중…' : '내 일정 동기화'}</span>
+                {!isSyncing && (
+                  <span className="sync-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 1 6.36 2.64L21 8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M21 3v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                )}
+              </button>
           </div>
 
           <div className="view-toggle-buttons">
@@ -368,6 +424,9 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
         )}
 
         {/* {isLoading && <div className="calendar-loading">구글 캘린더를 불러오는 중이예요...</div>} */}
+        {/* {isLoading && (
+          <div className="calendar-loading">구글 캘린더를 불러오는 중이예요...</div>
+        )} */}
 
         <div className={`calendar-surface ${bodyTransitionClass}`}>
           <FullCalendar

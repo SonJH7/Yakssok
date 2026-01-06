@@ -42,6 +42,58 @@ button, .custom-header span, .fc-col-header-cell-cushion {
   color: #c4c5b7;
 }
 
+.sync-button {
+  margin-left: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 18px 25px;
+  min-width: 157px;
+  height: 50px;
+  background: #F7F7F0;
+  color: #85837B;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0px 4px 25px rgba(0, 0, 0, 0.03);
+  font-size: 15px;
+  line-height: 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+
+.sync-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.sync-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.sync-label {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 500;
+  color: inherit;
+}
+
+.sync-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sync-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: #85837B;
+  stroke-width: 1.5px;
+}
+
 .view-toggle-buttons {
   display: flex;
   background: #E9E9E3;
@@ -100,6 +152,15 @@ button, .custom-header span, .fc-col-header-cell-cushion {
   justify-content: center;
   align-items: center;
   white-space: nowrap;
+}
+
+.calendar-loading {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #F9F5EC;
+  border-radius: 10px;
+  color: #85837B;
+  font-size: 14px;
 }
 
 /* ---------------------------------------------------- /
