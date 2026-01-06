@@ -285,9 +285,20 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
 
       const dayEvents = (events || []).filter((e) => {
         if (!e?.start) return false;
-        const d = new Date(e.start);
-        d.setHours(0, 0, 0, 0);
-        return d.getTime() === clicked.getTime();
+
+        const eventStart = new Date(e.start);
+        eventStart.setHours(0, 0, 0, 0);
+
+        const hasEnd = Boolean(e.end);
+        const eventEnd = hasEnd ? new Date(e.end) : new Date(e.start);
+        eventEnd.setHours(0, 0, 0, 0);
+
+        if (e.extendedProps?.isAllDay && hasEnd) {
+          eventEnd.setDate(eventEnd.getDate() - 1);
+        }
+
+        return clicked.getTime() >= eventStart.getTime() &&
+               clicked.getTime() <= eventEnd.getTime();
       })
       .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
