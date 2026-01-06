@@ -50,6 +50,7 @@ const Result = () => {
     return new Date(y, m - 1, d);
   };
 
+  // 날짜, 시간 형식 통일
   const formatDate = (dateStr) => {
     const [_, m, d] = dateStr.split("-").map(Number);
     return `${m}월 ${d}일`;
@@ -70,20 +71,54 @@ const Result = () => {
 
   const pad2 = (v) => String(v).padStart(2, "0");
 
-  const toIntOrNull = (v) => {
-    if (v === "") return null;
-    const n = Number(v);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+  // 입력
+  const isDigitsOnly = (s) => /^\d*$/.test(String(s));
+
+  const parseIntOrNull = (s) => {
+    if (s === "") return null;
+    if (!isDigitsOnly(s)) return null;
+    const n = Number(s);
+    if (!Number.isInteger(n)) return null;
     return n;
+  };
+
+  const isInRange = (n, min, max) => n !== null && n >= min && n <= max;
+
+  const commitNumericField = (rawValue, { min, max, setState }) => {
+    const v = String(rawValue);
+
+    if (v === "") {
+      setState("");
+      return;
+    }
+
+    if (!isDigitsOnly(v)) return;
+
+    const n = parseIntOrNull(v);
+    if (!isInRange(n, min, max)) return;
+
+    setState(v);
+  };
+
+  const handleDurationHoursChange = (value) => {
+    commitNumericField(value, { min: 1, max: 24, setState: setDurationHours });
+  };
+
+  const handleStartHourChange = (value) => {
+    commitNumericField(value, { min: 0, max: 23, setState: setStartHour });
+  };
+
+  const handleEndHourChange = (value) => {
+    commitNumericField(value, { min: 1, max: 24, setState: setEndHour });
   };
 
   // 입력값 유효성 확인
   const durationInt = useMemo(
-    () => toIntOrNull(durationHours),
+    () => parseIntOrNull(durationHours),
     [durationHours]
   );
-  const startInt = useMemo(() => toIntOrNull(startHour), [startHour]);
-  const endInt = useMemo(() => toIntOrNull(endHour), [endHour]);
+  const startInt = useMemo(() => parseIntOrNull(startHour), [startHour]);
+  const endInt = useMemo(() => parseIntOrNull(endHour), [endHour]);
 
   const isDurationEntered = durationInt !== null && durationInt > 0;
   const isTimeRangeSelected = startInt !== null && endInt !== null;
@@ -117,68 +152,21 @@ const Result = () => {
     minDurationMinutes,
   ]);
 
-  // 입력값 제한
-  const setDurationSafe = (value) => {
-    if (value === "") {
-      setDurationHours("");
-      return;
-    }
+  const timeRangeError = useMemo(() => {
+    if (!isDurationEntered || !isTimeRangeSelected) return "";
 
-    const n = Number(value);
-    if (!Number.isInteger(n) || n < 1 || n > 24) return;
+    if (endInt <= startInt) return "종료 시각은 시작 시각보다 늦어야 해요.";
+    if ((endInt - startInt) * 60 < minDurationMinutes)
+      return "시간대는 소요시간보다 길어야 해요.";
 
-    setDurationHours(value);
-
-    const s = toIntOrNull(startHour);
-    const e = toIntOrNull(endHour);
-    if (s !== null && e !== null) {
-      const needMin = n * 60;
-      const rangeMin = (e - s) * 60;
-      if (e <= s || rangeMin < needMin) setEndHour("");
-    }
-  };
-
-  const setStartSafe = (value) => {
-    if (value === "") {
-      setStartHour("");
-      return;
-    }
-
-    const sNew = Number(value);
-    if (!Number.isInteger(sNew) || sNew < 0 || sNew > 23) return;
-
-    const eCur = toIntOrNull(endHour);
-
-    if (eCur !== null && eCur <= sNew) return;
-
-    const d = toIntOrNull(durationHours);
-    if (d !== null && d > 0 && eCur !== null) {
-      if ((eCur - sNew) * 60 < d * 60) return;
-    }
-
-    setStartHour(value);
-  };
-
-  const setEndSafe = (value) => {
-    if (value === "") {
-      setEndHour("");
-      return;
-    }
-
-    const eNew = Number(value);
-    if (!Number.isInteger(eNew) || eNew < 1 || eNew > 24) return;
-
-    const sCur = toIntOrNull(startHour);
-
-    if (sCur !== null && eNew <= sCur) return;
-
-    const d = toIntOrNull(durationHours);
-    if (d !== null && d > 0 && sCur !== null) {
-      if ((eNew - sCur) * 60 < d * 60) return;
-    }
-
-    setEndHour(value);
-  };
+    return "";
+  }, [
+    isDurationEntered,
+    isTimeRangeSelected,
+    startInt,
+    endInt,
+    minDurationMinutes,
+  ]);
 
   // 약속 정보 불러오기
   const fetchDetail = useCallback(async (code) => {
@@ -449,13 +437,12 @@ const Result = () => {
             <label>
               약속에는&nbsp;
               <input
-                type="number"
-                min="1"
-                max="24"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={durationHours}
-                onChange={(e) => setDurationSafe(e.target.value)}
-                placeholder="0"
+                onChange={(e) => handleDurationHoursChange(e.target.value)}
+                placeholder="1"
                 className="setInput"
               />
               시간 소요돼요.
@@ -466,33 +453,33 @@ const Result = () => {
             <label>
               시간대는&nbsp;
               <input
-                type="number"
-                min="0"
-                max="23"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={startHour}
-                onChange={(e) => setStartSafe(e.target.value)}
+                onChange={(e) => handleStartHourChange(e.target.value)}
                 placeholder="0"
                 className="setInput"
               />
               &nbsp;시 부터&nbsp;
               <input
-                type="number"
-                min="1"
-                max="24"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={endHour}
-                onChange={(e) => setEndSafe(e.target.value)}
+                onChange={(e) => handleEndHourChange(e.target.value)}
                 placeholder="0"
                 className="setInput"
               />
               &nbsp;시 사이면 좋겠어요.
             </label>
 
-            <div className="errorText">
-              * 시간대는 소요시간보다 길어야 해요.
-              <br />* 시간대의 종료 시각은 시작 시각보다 늦어야 해요.
-            </div>
+            {!timeRangeError && (
+              <div className="errorText">* 시간은 24시간 형식이에요.</div>
+            )}
+            {timeRangeError && (
+              <div className="errorText">* {timeRangeError}</div>
+            )}
           </div>
         </div>
 
