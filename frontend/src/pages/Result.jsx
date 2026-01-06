@@ -1,93 +1,192 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import "./Result.css";
 import { API_BASE_URL } from "../config/api";
 
+/* 
+  추천 결과 페이지
+  - 약속 정보(기간) 표시
+  - 세부정보 필터링 기능
+  - 추천 결과 표시
+
+*/
+
+const NOT_FOUND = {
+  OK: "ok",
+  NOT_FOUND: "not found",
+};
+
 const Result = () => {
   const { inviteCode } = useParams();
 
+  // 사용자 입력
   const [durationHours, setDurationHours] = useState(""); // 약속 소요 시간(시간 단위)
+  const [startHour, setStartHour] = useState(""); // 시간대 시작 시각
+  const [endHour, setEndHour] = useState(""); // 시간대 종료 시각
 
-  const [startHour, setStartHour] = useState(""); // "0"~"24" 또는 ""
-  const [endHour, setEndHour] = useState(""); // "0"~"24" 또는 ""
-
+  // 로딩, 에러
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingOptimal, setLoadingOptimal] = useState(false);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(NOT_FOUND.OK);
 
+  // 약속 정보, 추천 결과
   const [detail, setDetail] = useState(null);
   const [optimal, setOptimal] = useState(null);
 
+  // 로그인 토큰
   const accessToken = localStorage.getItem("access_token");
 
   // 날짜 정규화
   const normalizeDateStr = (raw) => {
     const onlyDate = String(raw).split("T")[0];
-
     const [y, m, d] = onlyDate.split("-").map(Number);
-    const mm = String(m).padStart(2, "0");
-    const dd = String(d).padStart(2, "0");
-    return `${y}-${mm}-${dd}`;
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   };
 
+  // 로컬 날짜
   const makeLocalDate = (dateStr) => {
     const [y, m, d] = dateStr.split("-").map(Number);
     return new Date(y, m - 1, d);
   };
 
   const formatDate = (dateStr) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
+    const [_, m, d] = dateStr.split("-").map(Number);
     return `${m}월 ${d}일`;
   };
 
-  function formatDay(dateStr) {
+  const formatDay = (dateStr) => {
     const date = makeLocalDate(dateStr);
     const days = ["일", "월", "화", "수", "목", "금", "토"];
-    return days[date.getDay()] + "요일";
-  }
+    return `${days[date.getDay()]}요일`;
+  };
 
   const formatTime = (hhmm) => {
-    const [hh, mm] = hhmm.split(":").map(Number);
-    const total = hh * 60 + mm;
-
-    const meridiem = total < 12 * 60 ? "오전" : "오후";
-    let h24 = hh;
-    if (h24 === 24) h24 = 0;
-
-    const h12raw = h24 % 12;
-    const h12 = h12raw === 0 ? 12 : h12raw;
-
-    return `${meridiem} ${String(h12).padStart(2, "0")}시 ${String(mm).padStart(
-      2,
-      "0"
-    )}분`;
+    const [hh, mm] = String(hhmm).split(":").map(Number);
+    const h = Number.isFinite(hh) ? hh : 0;
+    const m = Number.isFinite(mm) ? mm : 0;
+    return `${String(h).padStart(2, "0")}시 ${String(m).padStart(2, "0")}분`;
   };
 
-  const toMinutes = (hhmm) => {
-    const [h, m] = hhmm.split(":").map(Number);
-    return h * 60 + m;
+  const pad2 = (v) => String(v).padStart(2, "0");
+
+  const toIntOrNull = (v) => {
+    if (v === "") return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+    return n;
   };
 
-  const toHHMM = (mins) => {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  };
+  // 입력값 유효성 확인
+  const durationInt = useMemo(
+    () => toIntOrNull(durationHours),
+    [durationHours]
+  );
+  const startInt = useMemo(() => toIntOrNull(startHour), [startHour]);
+  const endInt = useMemo(() => toIntOrNull(endHour), [endHour]);
 
-  const isDurationEntered = durationHours !== "" && Number(durationHours) > 0;
-  const isTimeRangeSelected = startHour !== "" && endHour !== "";
+  const isDurationEntered = durationInt !== null && durationInt > 0;
+  const isTimeRangeSelected = startInt !== null && endInt !== null;
 
+  // 소요시간(분)
   const minDurationMinutes = useMemo(() => {
-    const h = Number(durationHours);
-    if (Number.isFinite(h) && h > 0) return Math.round(h * 60);
-    return 0;
-  }, [durationHours]);
+    if (!isDurationEntered) return 0;
+    return durationInt * 60;
+  }, [isDurationEntered, durationInt]);
 
-  const fetchDetail = async (code) => {
+  const timeRangeStart = useMemo(() => {
+    if (startInt === null) return null;
+    return `${pad2(startInt)}:00`;
+  }, [startInt]);
+
+  const timeRangeEnd = useMemo(() => {
+    if (endInt === null) return null;
+    return `${pad2(endInt)}:00`;
+  }, [endInt]);
+
+  // 시간대 유효성 확인
+  const isTimeRangeValid = useMemo(() => {
+    if (!isDurationEntered || !isTimeRangeSelected) return false;
+    if (endInt <= startInt) return false;
+    return (endInt - startInt) * 60 >= minDurationMinutes;
+  }, [
+    isDurationEntered,
+    isTimeRangeSelected,
+    startInt,
+    endInt,
+    minDurationMinutes,
+  ]);
+
+  // 입력값 제한
+  const setDurationSafe = (value) => {
+    if (value === "") {
+      setDurationHours("");
+      return;
+    }
+
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > 24) return;
+
+    setDurationHours(value);
+
+    const s = toIntOrNull(startHour);
+    const e = toIntOrNull(endHour);
+    if (s !== null && e !== null) {
+      const needMin = n * 60;
+      const rangeMin = (e - s) * 60;
+      if (e <= s || rangeMin < needMin) setEndHour("");
+    }
+  };
+
+  const setStartSafe = (value) => {
+    if (value === "") {
+      setStartHour("");
+      return;
+    }
+
+    const sNew = Number(value);
+    if (!Number.isInteger(sNew) || sNew < 0 || sNew > 23) return;
+
+    const eCur = toIntOrNull(endHour);
+
+    if (eCur !== null && eCur <= sNew) return;
+
+    const d = toIntOrNull(durationHours);
+    if (d !== null && d > 0 && eCur !== null) {
+      if ((eCur - sNew) * 60 < d * 60) return;
+    }
+
+    setStartHour(value);
+  };
+
+  const setEndSafe = (value) => {
+    if (value === "") {
+      setEndHour("");
+      return;
+    }
+
+    const eNew = Number(value);
+    if (!Number.isInteger(eNew) || eNew < 1 || eNew > 24) return;
+
+    const sCur = toIntOrNull(startHour);
+
+    if (sCur !== null && eNew <= sCur) return;
+
+    const d = toIntOrNull(durationHours);
+    if (d !== null && d > 0 && sCur !== null) {
+      if ((eNew - sCur) * 60 < d * 60) return;
+    }
+
+    setEndHour(value);
+  };
+
+  // 약속 정보 불러오기
+  const fetchDetail = useCallback(async (code) => {
     if (!code) return;
 
     setLoadingDetail(true);
     setError("");
+    setNotFound(NOT_FOUND.OK);
 
     try {
       const res = await fetch(`${API_BASE_URL}/appointments/${code}/detail`, {
@@ -95,73 +194,120 @@ const Result = () => {
         headers: { "Content-Type": "application/json" },
       });
 
+      if (res.status === 404) {
+        setNotFound(NOT_FOUND.NOT_FOUND);
+        setDetail(null);
+        return;
+      }
+
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`detail 실패: ${res.status} ${text}`);
+        throw new Error(text);
       }
 
       const data = await res.json();
       setDetail(data);
-    } catch (e) {
-      setError(e?.message || "detail 불러오기 실패");
+    } catch {
+      setError("약속 정보를 불러오지 못했어요.");
     } finally {
       setLoadingDetail(false);
     }
-  };
+  }, []);
 
-  const fetchOptimal = async (code, token, minDuration = 60) => {
-    if (!code) return;
+  // 추천 결과 불러오기
+  const fetchOptimal = useCallback(
+    async ({ code, token, minDuration, rangeStart, rangeEnd }) => {
+      if (!code) return;
 
-    setLoadingOptimal(true);
-    setError("");
+      setLoadingOptimal(true);
+      setError("");
+      setNotFound(NOT_FOUND.OK);
 
-    try {
-      if (!token) throw new Error("로그인이 필요해요.");
+      try {
+        const url = new URL(
+          `${API_BASE_URL}/appointments/${code}/optimal-times`
+        );
+        url.searchParams.set("min_duration_minutes", String(minDuration));
+        url.searchParams.set("time_range_start", String(rangeStart));
+        url.searchParams.set("time_range_end", String(rangeEnd));
 
-      const url = new URL(`${API_BASE_URL}/appointments/${code}/optimal-times`);
-      url.searchParams.set("min_duration_minutes", String(minDuration));
+        const res = await fetch(url.toString(), {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      const res = await fetch(url.toString(), {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`optimal-times 실패: ${res.status} ${text}`);
+        }
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`optimal-times 실패: ${res.status} ${text}`);
+        const data = await res.json();
+        setOptimal(data);
+      } catch (e) {
+        setError(e?.message || "추천 결과 불러오기 실패");
+      } finally {
+        setLoadingOptimal(false);
       }
+    },
+    []
+  );
 
-      const data = await res.json();
-      setOptimal(data);
-    } catch (e) {
-      setError(e?.message || "optimal-times 불러오기 실패");
-    } finally {
-      setLoadingOptimal(false);
-    }
-  };
+  // 추천 결과 리스트
+  const optimalList = useMemo(() => optimal?.optimal_times || [], [optimal]);
 
+  // 초대코드 변경 시 입력값 초기화
   useEffect(() => {
-    fetchDetail(inviteCode);
-  }, [inviteCode]);
+    setDurationHours("");
+    setStartHour("");
+    setEndHour("");
+    setOptimal(null);
+    setError("");
+    setDetail(null);
 
+    setNotFound(accessToken ? NOT_FOUND.OK : NOT_FOUND.LOGIN_REQUIRED);
+  }, [inviteCode, accessToken]);
+
+  // 약속 정보 로딩
+  useEffect(() => {
+    if (!inviteCode) return;
+    fetchDetail(inviteCode);
+  }, [inviteCode, fetchDetail]);
+
+  // 추천 결과 로딩 (디바운스)
   const debounceRef = useRef(null);
 
   useEffect(() => {
     if (!inviteCode) return;
+    if (
+      notFound === NOT_FOUND.LOGIN_REQUIRED ||
+      notFound === NOT_FOUND.NOT_FOUND
+    )
+      return;
 
-    if (!isDurationEntered || !isTimeRangeSelected) {
+    // 입력이 불완전/유효하지 않으면 호출 X
+    if (!isTimeRangeValid) {
       setOptimal(null);
-      setError("");
+      return;
+    }
+
+    if (!timeRangeStart || !timeRangeEnd) {
+      setOptimal(null);
       return;
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(() => {
-      fetchOptimal(inviteCode, accessToken, minDurationMinutes);
+      fetchOptimal({
+        code: inviteCode,
+        token: accessToken,
+        minDuration: minDurationMinutes,
+        rangeStart: timeRangeStart,
+        rangeEnd: timeRangeEnd,
+      });
     }, 300);
 
     return () => {
@@ -170,11 +316,15 @@ const Result = () => {
   }, [
     inviteCode,
     accessToken,
-    isDurationEntered,
-    isTimeRangeSelected,
+    notFound,
+    isTimeRangeValid,
     minDurationMinutes,
+    timeRangeStart,
+    timeRangeEnd,
+    fetchOptimal,
   ]);
 
+  // 달력 렌더링
   const daysForGrid = useMemo(() => {
     if (!detail?.dates) return [];
 
@@ -224,12 +374,10 @@ const Result = () => {
 
       cells.push({
         key: dateStr,
-        type: "day",
         dateStr,
         day: cur.getDate(),
         dayOfWeek: cur.getDay(),
         selectedDay: rangeMap.get(dateStr) === true,
-        inRange: rangeMap.has(dateStr),
       });
 
       cur.setDate(cur.getDate() + 1);
@@ -244,76 +392,19 @@ const Result = () => {
     return `${date.getMonth() + 1}월`;
   }, [daysForGrid]);
 
-  const optimalList = useMemo(() => optimal?.optimal_times || [], [optimal]);
+  if (notFound === NOT_FOUND.NOT_FOUND) {
+    const Type = "존재하지 않는 약속이에요.";
+    const Text = "삭제된 약속이거나 잘못된 초대코드일 수 있어요.";
 
-  const preferredStartHHMM =
-    startHour === "" ? null : `${String(startHour).padStart(2, "0")}:00`;
-  const preferredEndHHMM =
-    endHour === "" ? null : `${String(endHour).padStart(2, "0")}:00`;
-
-  const timeRangeError = useMemo(() => {
-    if (!isDurationEntered) return "";
-    if (startHour === "" || endHour === "") return "";
-
-    const s = Number(startHour);
-    const e = Number(endHour);
-
-    if (!Number.isFinite(s) || !Number.isFinite(e)) return "";
-    if (e <= s) return "종료 시간은 시작 시간보다 늦어야 해요.";
-
-    const rangeMinutes = (e - s) * 60;
-    if (rangeMinutes < minDurationMinutes) {
-      return `시간대가 소요시간에 비해 짧아요.`;
-    }
-    return "";
-  }, [isDurationEntered, startHour, endHour, minDurationMinutes]);
-
-  const filteredOptimalList = useMemo(() => {
-    if (!isDurationEntered || !isTimeRangeSelected) return [];
-
-    if (!optimalList.length) return [];
-    if (timeRangeError) return [];
-
-    if (!preferredStartHHMM || !preferredEndHHMM) return [];
-
-    const ps = toMinutes(preferredStartHHMM);
-    const pe = toMinutes(preferredEndHHMM);
-
-    if (pe <= ps) return [];
-
-    const D = minDurationMinutes;
-
-    return optimalList
-      .map((item) => {
-        const s = toMinutes(item.start_time);
-        const e = toMinutes(item.end_time);
-
-        const Istart = Math.max(s, ps);
-        const Iend = Math.min(e, pe);
-
-        if (Iend - Istart < D) return null;
-
-        const pickedStart = Istart;
-        const pickedEnd = Istart + D;
-
-        return {
-          ...item,
-          start_time: toHHMM(pickedStart),
-          end_time: toHHMM(pickedEnd),
-          duration_minutes: D,
-        };
-      })
-      .filter(Boolean);
-  }, [
-    isDurationEntered,
-    isTimeRangeSelected,
-    optimalList,
-    timeRangeError,
-    preferredStartHHMM,
-    preferredEndHHMM,
-    minDurationMinutes,
-  ]);
-
+    return (
+      <div className="resultPage">
+        <div className="resultContainer">
+          <div className="errorType">{Type}</div>
+          <div className="errorText">{Text}</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="resultPage">
       <div className="resultContainer">
@@ -363,8 +454,8 @@ const Result = () => {
                 max="24"
                 step="1"
                 value={durationHours}
-                onChange={(e) => setDurationHours(e.target.value)}
-                placeholder="1"
+                onChange={(e) => setDurationSafe(e.target.value)}
+                placeholder="0"
                 className="setInput"
               />
               시간 소요돼요.
@@ -377,30 +468,31 @@ const Result = () => {
               <input
                 type="number"
                 min="0"
-                max="24"
+                max="23"
                 step="1"
                 value={startHour}
-                onChange={(e) => setStartHour(e.target.value)}
+                onChange={(e) => setStartSafe(e.target.value)}
                 placeholder="0"
                 className="setInput"
               />
               &nbsp;시 부터&nbsp;
               <input
                 type="number"
-                min="0"
+                min="1"
                 max="24"
                 step="1"
                 value={endHour}
-                onChange={(e) => setEndHour(e.target.value)}
+                onChange={(e) => setEndSafe(e.target.value)}
                 placeholder="0"
                 className="setInput"
               />
               &nbsp;시 사이면 좋겠어요.
             </label>
 
-            {timeRangeError && (
-              <div className="errorText">{timeRangeError}</div>
-            )}
+            <div className="errorText">
+              * 시간대는 소요시간보다 길어야 해요.
+              <br />* 시간대의 종료 시각은 시작 시각보다 늦어야 해요.
+            </div>
           </div>
         </div>
 
@@ -422,14 +514,12 @@ const Result = () => {
                 <>
                   {loadingOptimal}
 
-                  {!loadingOptimal &&
-                    !error &&
-                    filteredOptimalList.length === 0 && (
-                      <div>추천 가능한 시간이 없어요.</div>
-                    )}
+                  {!loadingOptimal && !error && optimalList.length === 0 && (
+                    <div>추천 가능한 날짜가 없어요.</div>
+                  )}
 
                   {!loadingOptimal &&
-                    filteredOptimalList.slice(0, 5).map((item, index) => (
+                    optimalList.slice(0, 5).map((item, index) => (
                       <div
                         key={`${item.date}-${item.start_time}-${index}`}
                         className="resultCard"

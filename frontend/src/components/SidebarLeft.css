@@ -245,13 +245,6 @@ button:focus {
   transition: max-height 0.35s ease, opacity 0.2s ease;
 }
 
-.sidebarLeft.open .iconRow {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  padding: 0;
-}
-
 .iconButton {
   display: flex;
   flex-direction: column;
@@ -288,13 +281,6 @@ button:focus {
 
   opacity: 1;
   transition: max-height 0.35s ease, opacity 0.2s ease;
-}
-
-.sidebarLeft.closed .calendar {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  padding: 0;
 }
 
 .calendarHeader {
@@ -398,13 +384,6 @@ button:focus {
 
   opacity: 1;
   transition: max-height 0.35s ease, opacity 0.2s ease;
-}
-
-.sidebarLeft.closed .appointments {
-  max-height: 0;
-  opacity: 0;
-  margin: 0;
-  padding: 0;
 }
 
 .appointmentsBox {

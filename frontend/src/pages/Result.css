@@ -184,12 +184,23 @@
   text-align: center;
 }
 
-.errorText {
+.errorType {
   font-family: 'Pretendard';
   font-style: normal;
   font-weight: 500;
-  font-size: 20px;
-  line-height: 24px;
+  font-size: 25px;
+  line-height: 34px;
+  color: #85837b;
+  margin: 45px;
+  text-align: center;
+}
+
+.errorText {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 22px;
   color: #85837b;
   margin: 45px;
   text-align: center;
@@ -254,7 +265,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .resultCard {
-  width: 900px;
+  width: 700px;
   padding: 10px 30px;
   border-radius: 20px;
   background: #E9E9E3;

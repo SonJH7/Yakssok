@@ -41,12 +41,10 @@ const SidebarLeft = ({ events = [] }) => {
       navigate("/home");
       return;
     }
-
     if (isCreatePage && isOpen) {
       navigate(0); // create 페이지 새로고침
       return;
     }
-
     navigate("/create");
   };
 
@@ -115,6 +113,7 @@ const SidebarLeft = ({ events = [] }) => {
         2,
         "0"
       )}-${String(d).padStart(2, "0")}`;
+
       const hasAppointment = appointmentsDateSet.has(dateStr);
       const dayOfWeek = new Date(currentYear, currentMonth, d).getDay();
 
@@ -156,12 +155,12 @@ const SidebarLeft = ({ events = [] }) => {
   const daysOfWeek = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
-    <>
-      <div className={`sidebarLeft ${isOpen ? "open" : "closed"}`}>
+    <div className={`sidebarLeft ${isOpen ? "open" : "closed"}`}>
         {/* 로고 + 열고 닫는 버튼 */}
         <div
-          className={`sidebarLeftLogo ${isOpen ? "open" : ""} 
-          ${isLogoHovered ? "hovered" : ""}`}
+          className={`sidebarLeftLogo ${isOpen ? "open" : ""} ${
+            isLogoHovered ? "hovered" : ""
+          }`}
           onMouseEnter={() => setIsLogoHovered(true)}
           onMouseLeave={() => setIsLogoHovered(false)}
         >
@@ -178,6 +177,7 @@ const SidebarLeft = ({ events = [] }) => {
           >
             <CloseButton />
           </button>
+
           <LogoIcon className="logoIcon" />
         </div>
 
@@ -197,75 +197,83 @@ const SidebarLeft = ({ events = [] }) => {
           {isOpen && <div className="buttonText">새로운 약속 만들기</div>}
         </button>
 
-        {/* 페이지 이동 버튼 (사이드바 닫힌 상태) */}
-        <div className="iconRow">
-          <button className="iconButton" onClick={() => navigate("/home")}>
-            {isHomePage ? <CalendarIconSelected /> : <CalendarIcon />}
-            <span className="iconText">약속 달력</span>
-          </button>
-          <button className="iconButton" /* onClick={() => navigate("/list")}*/>
-            {isListPage ? <ListIconSelected /> : <ListIcon />}
-            <span className="iconText">약속 목록</span>
-          </button>
-        </div>
+        {/* 페이지 이동 버튼 (닫힌 상태에서만 렌더) */}
+        {!isOpen && (
+          <div className="iconRow">
+            <button className="iconButton" onClick={() => navigate("/home")}>
+              {isHomePage ? <CalendarIconSelected /> : <CalendarIcon />}
+              <span className="iconText">약속 달력</span>
+            </button>
 
-        {/* 약속 달력 */}
-        <div className="calendar">
-          <div className="calendarHeader">
-            <button className="moveMonth" onClick={() => moveMonth(-1)}>
-              {"<"}
-            </button>
-            <span>{currentMonth + 1}월</span>
-            <button className="moveMonth" onClick={() => moveMonth(1)}>
-              {">"}
-            </button>
-            <button className="todayButton" onClick={handleGoToday}>
-              오늘
+            <button
+              className="iconButton" /* onClick={() => navigate("/list")} */
+            >
+              {isListPage ? <ListIconSelected /> : <ListIcon />}
+              <span className="iconText">약속 목록</span>
             </button>
           </div>
+        )}
 
-          {/* 요일 */}
-          <div className="calendarGrid daysofWeek">
-            {daysOfWeek.map((day, index) => {
-              <div
-                key={day}
-                className={`dayName ${index === 0 ? "sunday" : ""} ${
-                  index === 6 ? "saturday" : ""
-                }`}
-              >
-                {day}
-              </div>;
-            })}
-          </div>
+        {/* 약속 달력 (열린 상태에서만 렌더) */}
+        {isOpen && (
+          <div className="calendar">
+            <div className="calendarHeader">
+              <button className="moveMonth" onClick={() => moveMonth(-1)}>
+                {"<"}
+              </button>
+              <span>{currentMonth + 1}월</span>
+              <button className="moveMonth" onClick={() => moveMonth(1)}>
+                {">"}
+              </button>
+              <button className="todayButton" onClick={handleGoToday}>
+                오늘
+              </button>
+            </div>
 
-          {/* 날짜 */}
-          <div className="calendarGrid">{renderCalendar()}</div>
-        </div>
-
-        {/* 약속 목록 */}
-        <div className="appointments">
-          <div className="appointmentsBox">
-            <ul>
-              {appointmentsList.map((a) => (
-                <li
-                  key={a.id}
-                  className={`appointmentItem`}
-                  onClick={() =>
-                    a.invite_link && navigate(`/result/${a.invite_link}`)
-                  }
+            {/* 요일 */}
+            <div className="calendarGrid daysofWeek">
+              {daysOfWeek.map((day, index) => (
+                <div
+                  key={day}
+                  className={`dayName ${index === 0 ? "sunday" : ""} ${
+                    index === 6 ? "saturday" : ""
+                  }`}
                 >
-                  <ListDot />
-                  <span className="appointmentText">{a.text}</span>
-                </li>
+                  {day}
+                </div>
               ))}
-            </ul>
+            </div>
+
+            {/* 날짜 */}
+            <div className="calendarGrid">{renderCalendar()}</div>
           </div>
-        </div>
+        )}
+
+        {/* 약속 목록 (열린 상태에서만 렌더) */}
+        {isOpen && (
+          <div className="appointments">
+            <div className="appointmentsBox">
+              <ul>
+                {appointmentsList.map((a) => (
+                  <li
+                    key={a.id}
+                    className="appointmentItem"
+                    onClick={() =>
+                      a.invite_link && navigate(`/result/${a.invite_link}`)
+                    }
+                  >
+                    <ListDot />
+                    <span className="appointmentText">{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* 프로필 */}
         <div className="profile" />
       </div>
-    </>
   );
 };
 
