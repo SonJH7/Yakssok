@@ -16,7 +16,7 @@ const DateCheckIcon = () => (
   </svg>
 );
 
-const UpdateEvent = ({ event, onSave, onCancel }) => {
+const UpdateEvent = ({ event, eventsForDate = [], onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -114,6 +114,14 @@ const UpdateEvent = ({ event, onSave, onCancel }) => {
   };
 
   const displayDate = event ? new Date(event.start) : null;
+  const selectedId = event?.id;
+  const sourceEvents = eventsForDate.length > 0 ? eventsForDate : event ? [event] : [];
+  const orderedEvents = selectedId
+    ? [
+        ...sourceEvents.filter((evt) => evt.id === selectedId),
+        ...sourceEvents.filter((evt) => evt.id !== selectedId),
+      ]
+    : sourceEvents;
 
   return (
     <div className="event-page-overlay">
@@ -140,6 +148,20 @@ const UpdateEvent = ({ event, onSave, onCancel }) => {
           </div>
           <div className="date-check-icon">
             <DateCheckIcon />
+          </div>
+          <div className="selected-event-title-list" style={{ color: '#FFFFFF' }}>
+            {orderedEvents.map((evt) => {
+              const title = evt?.title || evt?.summary || '제목 없음';
+              const isSelected = evt?.id === selectedId;
+              return (
+                <span
+                  key={evt.id || title}
+                  className={`selected-event-title${isSelected ? ' selected-event-title--active' : ''}`}
+                >
+                  {title}
+                </span>
+              );
+            })}
           </div>
         </div>
 

@@ -26,16 +26,25 @@ const CreateEvent = ({ date, onSave, onCancel }) => {
   const [startTime, setStartTime] = useState('12:00');
   const [endTime, setEndTime] = useState('13:00');
 
+  const computeTimeRangeInvalid = () => {
+    if (!date) return false;
+
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+
+    const newStartDate = new Date(date);
+    newStartDate.setHours(startH, startM);
+
+    const newEndDate = new Date(date);
+    newEndDate.setHours(endH, endM);
+
+    return newEndDate < newStartDate;
+  };
+
+  const isSaveDisabled = !title.trim() || !date || computeTimeRangeInvalid();
+
   const handleSave = () => {
-    if (!title.trim()) {
-      alert('약속 이름을 입력해주세요!');
-      return;
-    }
-    if (!date) {
-        alert("날짜 정보가 없습니다.");
-        onCancel();
-        return;
-    }
+    if (isSaveDisabled) return;
 
     // 시작 시간 Date 객체 생성
     const newStartDate = new Date(date);
@@ -120,7 +129,7 @@ const CreateEvent = ({ date, onSave, onCancel }) => {
         </div>
 
         <div className="button-group">
-          <button className="btn primary" onClick={handleSave}>추가하기</button>
+          <button className="btn primary" onClick={handleSave} disabled={isSaveDisabled}>추가하기</button>
           <button className="btn secondary" onClick={onCancel}>뒤로가기</button>
         </div>
       </div>

@@ -109,6 +109,7 @@ const Invited = () => {
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedDateEvents, setSelectedDateEvents] = useState([]);
 
   const [selectionContext, setSelectionContext] = useState(null);
   const [selectionValues, setSelectionValues] = useState([]);
@@ -150,6 +151,18 @@ const Invited = () => {
     }
   }, [code, navigate, location.pathname, location.search]);
 
+  const ensureValidToken = useCallback(() => {
+    const token = localStorage.getItem('access_token');
+
+    if (!token || isAccessTokenExpired(token)) {
+      localStorage.removeItem('access_token');
+      redirectToLogin();
+      return null;
+    }
+
+    return token;
+  }, [isAccessTokenExpired, redirectToLogin]);
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
 
@@ -163,7 +176,12 @@ const Invited = () => {
   useEffect(() => {
     const token = localStorage.getItem('access_token');
 
-    if (!code || !token || isAccessTokenExpired(token)) return;
+    if (!code || !token) return;
+    if (isAccessTokenExpired(token)) {
+      localStorage.removeItem('access_token');
+      redirectToLogin();
+      return;
+    }
 
     const fetchAppointment = async () => {
       if (!code) return;
@@ -382,11 +400,8 @@ const Invited = () => {
   const isSelectedId = (id) => selectionValues.includes(id);
 
   const syncMySchedules = async () => {
-    const token = localStorage.getItem('access_token');
-    
-    if (!token) {
-      throw new Error('일정 동기화를 위해 로그인 후 다시 시도해주세요.');
-    }
+    const token = ensureValidToken();
+    if (!token) return null;
 
     const response = await fetch(`${API_BASE_URL}/appointments/sync-my-schedules`, {
       method: 'POST',
@@ -397,6 +412,12 @@ const Invited = () => {
 
     const data = await response.json().catch(() => null);
 
+    if (response.status === 401) {
+      localStorage.removeItem('access_token');
+      redirectToLogin();
+      return null;
+    }
+
     if (!response.ok) {
       const message = data?.detail || '약속 일정 동기화에 실패했습니다.';
       throw new Error(message);
@@ -406,11 +427,8 @@ const Invited = () => {
   };
 
   const joinAppointment = async () => {
-    const token = localStorage.getItem('access_token');
-
-    if (!token) {
-      throw new Error('약속 참여를 위해 로그인 후 다시 시도해주세요.');
-    }
+    const token = ensureValidToken();
+    if (!token) return null;
 
     const response = await fetch(`${API_BASE_URL}/appointments/join`, {
       method: 'POST',
@@ -422,6 +440,12 @@ const Invited = () => {
     });
 
     const data = await response.json().catch(() => null);
+
+    if (response.status === 401) {
+      localStorage.removeItem('access_token');
+      redirectToLogin();
+      return null;
+    }
 
     if (!response.ok) {
       const message = data?.detail || '약속 참여에 실패했습니다.';
@@ -475,6 +499,7 @@ const Invited = () => {
 
     if (dayEvents.length === 1) {
       setSelectedEvent(dayEvents[0]);
+      setSelectedDateEvents(dayEvents);
       setPrevViewMode('list');
       setViewMode('update');
       setActiveMenuId(null);
@@ -565,11 +590,11 @@ const Invited = () => {
         return;
       }
       setSelectedEvent(target);
+      setSelectedDateEvents(selectionContext.events);
       setPrevViewMode('select-edit');
       setViewMode('update');
     } else if (selectionContext.mode === 'delete') {
       if (selectionValues.length === 0) {
-        alert('삭제할 일정을 선택해주세요.');
         return;
       }
       confirmDelete(selectionValues); 
@@ -625,12 +650,8 @@ const Invited = () => {
   };
 
   const syncWithGoogleCalendar = async () => {
-    const token = localStorage.getItem('access_token');
-
-    if (!token) {
-      alert('캘린더 동기화를 위해 로그인 후 다시 시도해주세요.');
-      return;
-    }
+    const token = ensureValidToken();
+    if (!token) return;
 
     if (
       pendingAddEvents.length === 0 &&
@@ -652,6 +673,12 @@ const Invited = () => {
           body: JSON.stringify(update.payload),
         });
 
+        if (res.status === 401) {
+          localStorage.removeItem('access_token');
+          redirectToLogin();
+          return;
+        }
+
         if (!res.ok) {
           const message = (await res.json())?.detail || '일정 수정에 실패했습니다.';
           throw new Error(message);
@@ -665,6 +692,12 @@ const Invited = () => {
             Authorization: `Bearer ${token}`,
           },
         });
+
+        if (res.status === 401) {
+          localStorage.removeItem('access_token');
+          redirectToLogin();
+          return;
+        }
 
         if (!res.ok) {
           const message = (await res.json())?.detail || '일정 삭제에 실패했습니다.';
@@ -695,6 +728,12 @@ const Invited = () => {
           body: JSON.stringify(payload),
         });
 
+        if (res.status === 401) {
+          localStorage.removeItem('access_token');
+          redirectToLogin();
+          return;
+        }
+
         if (!res.ok) {
           const message = (await res.json())?.detail || '일정 추가에 실패했습니다.';
           throw new Error(message);
@@ -714,6 +753,8 @@ const Invited = () => {
 
   const handleConfirm = async () => {
     try {
+      const token = ensureValidToken();
+      if (!token) return;
       await joinAppointment(); // 약속 참여 처리
       await syncWithGoogleCalendar(); // 구글 캘린더 반영
       const syncResult = await syncMySchedules(); // 내가 참여한 약속 일정 동기화
@@ -747,7 +788,18 @@ const Invited = () => {
   }
 
   if (viewMode === 'select-edit' && selectionContext) {
+    const isMultiEdit =
+      selectionContext.mode === 'edit' &&
+      selectionContext.events.length > 1;
   const dateNum = getDateNumber(selectionContext.date);
+  const selectedEditId = selectionContext.mode === 'edit' ? selectionValues[0] : null;
+  const shouldHighlight = isMultiEdit;
+  const orderedSelectionEvents = selectedEditId
+    ? [
+        ...selectionContext.events.filter((evt) => evt.id === selectedEditId),
+        ...selectionContext.events.filter((evt) => evt.id !== selectedEditId),
+      ]
+    : selectionContext.events;
 
   return (
     <div className="event-page-overlay">
@@ -768,11 +820,28 @@ const Invited = () => {
         </div>
 
         {/* 날짜 카드 */}
-        <div className="selected-date-box" style={{ backgroundColor: '#F9CBAA' }}>
+        <div className="selected-date-box" style={{ backgroundColor: isMultiEdit ? '#F9CBAA' : 'transparent' }}>
           <div className="selected-date-num" style={{ color: '#FFFFFF' }}>
             {dateNum}
           </div>
           <div className="date-check-icon"><DateCheckIcon /></div>
+          <div className="selected-event-title-list" style={{ color: '#FFFFFF' }}>
+            {orderedSelectionEvents.map((evt) => {
+              const isSelected = evt.id === selectedEditId;
+              return (
+                <span
+                  key={evt.id}
+                  className={`selected-event-title${
+                    shouldHighlight && evt.id === selectedEditId
+                      ? ' selected-event-title--active'
+                      : ''
+                  }`}
+                >
+                  {evt.title}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         {/* 일정 리스트 (radio 선택) */}
@@ -816,6 +885,7 @@ const Invited = () => {
       <button
         className="btn primary"
         onClick={handleSelectionConfirm}
+        disabled={selectionValues.length === 0}
       >
         삭제하기
       </button>
@@ -866,6 +936,7 @@ const Invited = () => {
           <div className="invite-content-shell invite-fade-soft" key="update">
             <UpdateEvent
               event={selectedEvent}
+              eventsForDate={selectedDateEvents}
               onSave={updateEvent}
               onCancel={() => {
                 if (prevViewMode === 'select-edit') {
