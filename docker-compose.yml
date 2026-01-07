@@ -7,6 +7,6 @@ services:
       volumes:
         - ./backend:/app
       env_file:
-         - ./backend/.env
+         - ./backend/app/.env
       ports:
         - "7777:7777"
