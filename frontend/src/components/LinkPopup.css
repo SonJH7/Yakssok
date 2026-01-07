@@ -26,7 +26,7 @@
 .lp-modal {
   width: 914px; 
   height: 378px;
-  background: #F6FAED;
+  background: #F7F7F0;
   border-radius: 20px;
   padding: 56px 79px;
   text-align: center;
@@ -36,7 +36,7 @@
   font-family: 'Pretendard', sans-serif;
   font-size: 25px;
   font-weight: 300;
-  color: #1f1f1f;
+  color: #292929;
   margin-top: 67px;
   margin-bottom: 53px;
 }
@@ -49,7 +49,7 @@
   border: 0.5px solid #1F1F1F;
   border-radius: 10px;
   overflow: hidden;
-  background: white;
+  background: #F7F7F0;
 }
 
 .lp-input {
@@ -61,6 +61,7 @@
   font-size: 18px;
   font-weight: 500;
   color: #85837B;
+  background-color: #F7F7F0;
 }
 
 .lp-copy-btn {
@@ -79,6 +80,10 @@
   background: #85837B;
 }
 
+.lp-copy-icon {
+  color: #FDFDF8;
+}
+
 .lp-close-btn {
   width: 143px;
   height: 57px;
@@ -86,8 +91,8 @@
   margin: 0;
   border: none;
   border-radius: 15px;
-  background: #EAEEE0;
-  color: #1F1F1F;
+  background: #E9E9E3;
+  color: #292929;
   font-family: 'Pretendard', sans-serif;
   font-size: 18px;
   font-weight: 500;
