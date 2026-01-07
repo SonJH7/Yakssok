@@ -147,3 +147,29 @@ class ConfirmAppointmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CalendarSyncSummary(BaseModel):
+    total: int
+    success: int
+    failed: int
+    skipped: int
+    pending: int
+
+
+class CalendarSyncParticipantStatus(BaseModel):
+    user_id: str
+    participation_status: str
+    calendar_sync_status: Optional[str]
+    calendar_sync_error: Optional[str]
+    calendar_synced_at: Optional[datetime]
+    needs_reauth: bool
+
+
+class CalendarSyncStatusResponse(BaseModel):
+    appointment_id: int
+    invite_link: str
+    is_creator: bool
+    summary: CalendarSyncSummary
+    participants: List[CalendarSyncParticipantStatus]
+    reauth_url: str

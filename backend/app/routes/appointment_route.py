@@ -17,6 +17,7 @@ from app.schema.appointment_schema import (
     SyncMySchedulesResponse,
     ConfirmAppointmentRequest,
     ConfirmAppointmentResponse,
+    CalendarSyncStatusResponse,
 )
 from app.utils.jwt import get_current_user
 
@@ -25,6 +26,59 @@ security = HTTPBearer()
 router = APIRouter(
     prefix="/appointments",
 )
+
+CALENDAR_REAUTH_URL = "/user/google/login?force=1"
+REAUTH_ERROR_CODES = {
+    "missing_refresh_token",
+    "calendar_scope_missing",
+    "insufficient_scope",
+    "google_reauth_required",
+}
+SYNC_SUCCESS_STATUSES = {"success"}
+SYNC_SKIPPED_STATUSES = {"skipped"}
+
+
+def _summarize_calendar_sync(participations):
+    summary = {"total": 0, "success": 0, "failed": 0, "skipped": 0, "pending": 0}
+    summary["total"] = len(participations)
+    for participation in participations:
+        status = participation.calendar_sync_status
+        if status in SYNC_SUCCESS_STATUSES:
+            summary["success"] += 1
+        elif status in SYNC_SKIPPED_STATUSES:
+            summary["skipped"] += 1
+        elif not status:
+            summary["pending"] += 1
+        else:
+            summary["failed"] += 1
+    return summary
+
+
+def _needs_reauth(calendar_sync_error):
+    return bool(calendar_sync_error) and calendar_sync_error in REAUTH_ERROR_CODES
+
+
+def _build_calendar_sync_response(appointment, participations, is_creator):
+    summary = _summarize_calendar_sync(participations)
+    participants_payload = [
+        {
+            "user_id": str(participation.user_id),
+            "participation_status": participation.status,
+            "calendar_sync_status": participation.calendar_sync_status,
+            "calendar_sync_error": participation.calendar_sync_error,
+            "calendar_synced_at": participation.calendar_synced_at,
+            "needs_reauth": _needs_reauth(participation.calendar_sync_error),
+        }
+        for participation in participations
+    ]
+    return CalendarSyncStatusResponse(
+        appointment_id=appointment.id,
+        invite_link=appointment.invite_link,
+        is_creator=is_creator,
+        summary=summary,
+        participants=participants_payload,
+        reauth_url=CALENDAR_REAUTH_URL,
+    )
 
 
 @router.post("/", response_model=AppointmentResponse)
@@ -248,6 +302,86 @@ async def sync_my_schedules(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"일정 동기화 실패: {str(e)}")
+
+
+@router.get("/{invite_code}/calendar-sync", response_model=CalendarSyncStatusResponse)
+async def get_calendar_sync_status(
+    invite_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    appointment = await AppointmentService.get_appointment_by_invite_code(
+        invite_code, db
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="appointment_not_found")
+
+    participation = await AppointmentService._get_participation(
+        current_user["sub"], appointment.id, db
+    )
+    if not participation:
+        raise HTTPException(status_code=403, detail="not_participant")
+
+    is_creator = appointment.creator_id == current_user["sub"]
+
+    if is_creator:
+        result = await db.execute(
+            select(Participations).where(
+                Participations.appointment_id == appointment.id
+            )
+        )
+        participations = result.scalars().all()
+    else:
+        participations = [participation]
+
+    return _build_calendar_sync_response(appointment, participations, is_creator)
+
+
+@router.post("/{invite_code}/calendar-sync", response_model=CalendarSyncStatusResponse)
+async def retry_calendar_sync(
+    invite_code: str,
+    scope: str = "me",
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    appointment = await AppointmentService.get_appointment_by_invite_code(
+        invite_code, db
+    )
+    if not appointment:
+        raise HTTPException(status_code=404, detail="appointment_not_found")
+    if appointment.status != "CONFIRMED":
+        raise HTTPException(status_code=400, detail="appointment_not_confirmed")
+
+    participation = await AppointmentService._get_participation(
+        current_user["sub"], appointment.id, db
+    )
+    if not participation:
+        raise HTTPException(status_code=403, detail="not_participant")
+
+    scope_value = (scope or "me").lower()
+    if scope_value not in {"me", "all"}:
+        raise HTTPException(status_code=400, detail="invalid_scope")
+
+    is_creator = appointment.creator_id == current_user["sub"]
+    if scope_value == "all" and not is_creator:
+        raise HTTPException(status_code=403, detail="creator_only")
+
+    if scope_value == "all":
+        result = await db.execute(
+            select(Participations).where(
+                Participations.appointment_id == appointment.id
+            )
+        )
+        participations = result.scalars().all()
+    else:
+        participations = [participation]
+
+    try:
+        await AppointmentService.retry_calendar_sync(appointment, participations, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return _build_calendar_sync_response(appointment, participations, is_creator)
 
 
 @router.post("/{invite_code}/confirm", response_model=ConfirmAppointmentResponse)
