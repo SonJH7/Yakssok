@@ -402,9 +402,37 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
           </div>
 
           <div className="nav-buttons">
-            <button onClick={handlePrevClick} className="nav-arrow">&lt;</button>
+            <button onClick={handlePrevClick} className="nav-arrow" aria-label="이전">
+              <svg
+                width="50"
+                height="50"
+                viewBox="0 0 50 50"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect width="50" height="50" rx="15" fill="#F7F7F0" />
+                <path
+                  d="M28.3839 32.955C28.6183 32.7206 28.7499 32.4027 28.7499 32.0713C28.7499 31.7398 28.6183 31.4219 28.3839 31.1875L22.1964 25L28.3839 18.8125C28.6116 18.5767 28.7376 18.261 28.7348 17.9332C28.7319 17.6055 28.6005 17.292 28.3687 17.0602C28.1369 16.8285 27.8234 16.697 27.4957 16.6942C27.1679 16.6913 26.8522 16.8173 26.6164 17.045L19.5452 24.1163C19.3108 24.3507 19.1792 24.6685 19.1792 25C19.1792 25.3315 19.3108 25.6493 19.5452 25.8838L26.6164 32.955C26.8508 33.1893 27.1687 33.321 27.5002 33.321C27.8316 33.321 28.1495 33.1893 28.3839 32.955Z"
+                  fill="#85837B"
+                />
+              </svg>
+            </button>
             <button onClick={handleTodayClick} className="today-button">오늘</button>
-            <button onClick={handleNextClick} className="nav-arrow">&gt;</button>
+            <button onClick={handleNextClick} className="nav-arrow" aria-label="다음">
+              <svg
+                width="50"
+                height="50"
+                viewBox="0 0 50 50"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect width="50" height="50" rx="15" transform="matrix(-1 0 0 1 50 0)" fill="#F7F7F0" />
+                <path
+                  d="M21.6161 32.955C21.3817 32.7206 21.2501 32.4027 21.2501 32.0713C21.2501 31.7398 21.3817 31.4219 21.6161 31.1875L27.8036 25L21.6161 18.8125C21.3884 18.5767 21.2624 18.261 21.2652 17.9332C21.2681 17.6055 21.3995 17.292 21.6313 17.0602C21.8631 16.8285 22.1766 16.697 22.5043 16.6942C22.8321 16.6913 23.1478 16.8173 23.3836 17.045L30.4548 24.1163C30.6892 24.3507 30.8208 24.6685 30.8208 25C30.8208 25.3315 30.6892 25.6493 30.4548 25.8838L23.3836 32.955C23.1492 33.1893 22.8313 33.321 22.4998 33.321C22.1684 33.321 21.8505 33.1893 21.6161 32.955Z"
+                  fill="#85837B"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 
