@@ -62,6 +62,10 @@ class Participations(Base):
         Enum("ATTENDING", "NOT_ATTENDING", "MAYBE"), nullable=False, default="ATTENDING"
     )
     available_slots = Column(TEXT)
+    google_event_id = Column(String(255), nullable=True)
+    calendar_sync_status = Column(String(20), nullable=True)
+    calendar_sync_error = Column(TEXT, nullable=True)
+    calendar_synced_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     appointment = relationship("Appointments", back_populates="participations")

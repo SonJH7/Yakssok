@@ -1,14 +1,18 @@
 import secrets
 import string
 import json
+from datetime import datetime
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from fastapi import HTTPException
 
 from app.models.appointment_model import Appointments, AppointmentDates, Participations
 from app.schema.appointment_schema import AppointmentCreateRequest
+from app.services.google_calendar_service import GoogleCalendarService
 from app.services.schedule_analyzer import ScheduleAnalyzer
 from app.services.user_service import UserService
+from app.variable import FRONTEND_URL
 
 
 class AppointmentService:
@@ -399,8 +403,6 @@ class AppointmentService:
         user_id: str,
         db: AsyncSession,
     ) -> Appointments:
-        from datetime import datetime
-
         # 약속 조회
         appointment = await AppointmentService.get_appointment_by_invite_code(
             invite_code, db
@@ -426,6 +428,76 @@ class AppointmentService:
 
         await db.commit()
         await db.refresh(appointment)
+
+        invite_link = FRONTEND_URL.rstrip("/")
+        description = (
+            f"Yakssok appointment: {appointment.name}\n"
+            f"Invite: {invite_link}/invite/{appointment.invite_link}"
+        )
+        date_str = (
+            confirmed_date.isoformat()
+            if hasattr(confirmed_date, "isoformat")
+            else str(confirmed_date)
+        )
+        start_iso = f"{date_str}T{confirmed_start_time}:00+09:00"
+        end_iso = f"{date_str}T{confirmed_end_time}:00+09:00"
+        event_payload = {
+            "summary": appointment.name,
+            "description": description,
+            "start": {"dateTime": start_iso, "timeZone": "Asia/Seoul"},
+            "end": {"dateTime": end_iso, "timeZone": "Asia/Seoul"},
+        }
+
+        participation_result = await db.execute(
+            select(Participations).where(
+                Participations.appointment_id == appointment.id
+            )
+        )
+        participations = participation_result.scalars().all()
+
+        for participation in participations:
+            if participation.status == "NOT_ATTENDING":
+                participation.calendar_sync_status = "skipped"
+                participation.calendar_sync_error = None
+                participation.calendar_synced_at = datetime.now()
+                continue
+
+            if participation.google_event_id:
+                participation.calendar_sync_status = "success"
+                participation.calendar_sync_error = None
+                participation.calendar_synced_at = datetime.now()
+                continue
+
+            user = await UserService.get_user_by_google_id(
+                str(participation.user_id), db
+            )
+            if not user or not user.google_refresh_token:
+                participation.calendar_sync_status = "failed"
+                participation.calendar_sync_error = "missing_refresh_token"
+                participation.calendar_synced_at = datetime.now()
+                continue
+
+            try:
+                access_token = await GoogleCalendarService.refresh_access_token(
+                    user.google_refresh_token
+                )
+                created = await GoogleCalendarService.create_event(
+                    access_token, event_payload
+                )
+                participation.google_event_id = created.get("id")
+                participation.calendar_sync_status = "success"
+                participation.calendar_sync_error = None
+                participation.calendar_synced_at = datetime.now()
+            except HTTPException as exc:
+                participation.calendar_sync_status = "failed"
+                participation.calendar_sync_error = str(exc.detail)
+                participation.calendar_synced_at = datetime.now()
+            except Exception:
+                participation.calendar_sync_status = "failed"
+                participation.calendar_sync_error = "unknown_error"
+                participation.calendar_synced_at = datetime.now()
+
+        await db.commit()
 
         return appointment
 

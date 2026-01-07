@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import get_db
+from app.models.appointment_model import Appointments, Participations
 from app.schema.calendar_schema import (
     EventCreateRequest,
     EventCreateResponse,
@@ -203,6 +207,77 @@ async def update_event(
             },
         )
 
+    participation_result = await db.execute(
+        select(Participations).where(Participations.google_event_id == event_id)
+    )
+    participation = participation_result.scalar_one_or_none()
+    appointment = None
+    if participation:
+        appointment_result = await db.execute(
+            select(Appointments).where(Appointments.id == participation.appointment_id)
+        )
+        appointment = appointment_result.scalar_one_or_none()
+
+    if appointment and appointment.status == "CONFIRMED":
+        if appointment.creator_id != user_id:
+            return JSONResponse(
+                status_code=403,
+                content={"code": "creator_only"},
+            )
+
+        event_data = event_request.model_dump(exclude_none=True)
+        updated_event = None
+
+        participants_result = await db.execute(
+            select(Participations).where(
+                Participations.appointment_id == appointment.id,
+                Participations.google_event_id.isnot(None),
+            )
+        )
+        participants = participants_result.scalars().all()
+
+        for participant in participants:
+            participant_user = await UserService.get_user_by_google_id(
+                str(participant.user_id), db
+            )
+            if not participant_user or not participant_user.google_refresh_token:
+                participant.calendar_sync_status = "failed_update"
+                participant.calendar_sync_error = "missing_refresh_token"
+                participant.calendar_synced_at = datetime.now()
+                continue
+
+            try:
+                access_token = await GoogleCalendarService.refresh_access_token(
+                    participant_user.google_refresh_token
+                )
+                updated = await GoogleCalendarService.update_event(
+                    access_token,
+                    participant.google_event_id,
+                    event_data,
+                )
+                participant.calendar_sync_status = "success"
+                participant.calendar_sync_error = None
+                participant.calendar_synced_at = datetime.now()
+                if participant.user_id == user_id:
+                    updated_event = updated
+            except HTTPException as exc:
+                participant.calendar_sync_status = "failed_update"
+                participant.calendar_sync_error = str(exc.detail)
+                participant.calendar_synced_at = datetime.now()
+            except Exception:
+                participant.calendar_sync_status = "failed_update"
+                participant.calendar_sync_error = "unknown_error"
+                participant.calendar_synced_at = datetime.now()
+
+        await db.commit()
+
+        return updated_event or EventCreateResponse(
+            id=event_id,
+            summary=event_data.get("summary", ""),
+            htmlLink="",
+            status="updated",
+        )
+
     try:
         access_token = await GoogleCalendarService.refresh_access_token(
             user.google_refresh_token
@@ -286,6 +361,67 @@ async def delete_event(
                 "reauthUrl": REAUTH_URL,
             },
         )
+
+    participation_result = await db.execute(
+        select(Participations).where(Participations.google_event_id == event_id)
+    )
+    participation = participation_result.scalar_one_or_none()
+    appointment = None
+    if participation:
+        appointment_result = await db.execute(
+            select(Appointments).where(Appointments.id == participation.appointment_id)
+        )
+        appointment = appointment_result.scalar_one_or_none()
+
+    if appointment and appointment.status == "CONFIRMED":
+        if appointment.creator_id != user_id:
+            return JSONResponse(
+                status_code=403,
+                content={"code": "creator_only"},
+            )
+
+        participants_result = await db.execute(
+            select(Participations).where(
+                Participations.appointment_id == appointment.id,
+                Participations.google_event_id.isnot(None),
+            )
+        )
+        participants = participants_result.scalars().all()
+
+        for participant in participants:
+            participant_user = await UserService.get_user_by_google_id(
+                str(participant.user_id), db
+            )
+            if not participant_user or not participant_user.google_refresh_token:
+                participant.calendar_sync_status = "failed_delete"
+                participant.calendar_sync_error = "missing_refresh_token"
+                participant.calendar_synced_at = datetime.now()
+                continue
+
+            try:
+                access_token = await GoogleCalendarService.refresh_access_token(
+                    participant_user.google_refresh_token
+                )
+                await GoogleCalendarService.delete_event(
+                    access_token,
+                    participant.google_event_id,
+                )
+                participant.google_event_id = None
+                participant.calendar_sync_status = "deleted"
+                participant.calendar_sync_error = None
+                participant.calendar_synced_at = datetime.now()
+            except HTTPException as exc:
+                participant.calendar_sync_status = "failed_delete"
+                participant.calendar_sync_error = str(exc.detail)
+                participant.calendar_synced_at = datetime.now()
+            except Exception:
+                participant.calendar_sync_status = "failed_delete"
+                participant.calendar_sync_error = "unknown_error"
+                participant.calendar_synced_at = datetime.now()
+
+        await db.commit()
+
+        return {"status": "deleted"}
 
     try:
         access_token = await GoogleCalendarService.refresh_access_token(
