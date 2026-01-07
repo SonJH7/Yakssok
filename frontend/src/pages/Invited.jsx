@@ -7,8 +7,77 @@ import UpdateEvent from '../components/UpdateEvent';
 import ExclamationIcon from '../assets/ExclamationIcon';
 import CheckCircleIcon from '../assets/CheckCircleIcon';
 import EmptyCircleIcon from '../assets/EmptyCircleIcon';
+import QuestionIcon from '../assets/QuestionIcon';
+import DateCheckIcon from '../assets/DateCheckIcon';
 import { API_BASE_URL } from '../config/api';
-import './Invited.css'; 
+import './Invited.css';
+
+const CheckedBoxIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+    <rect
+      x="2"
+      y="2"
+      width="22"
+      height="22"
+      rx="2"
+      stroke="#EEB1B1"
+      strokeWidth="2.5"
+    />
+
+    <path
+      d="M7 13.5L11 17.5L19 9.5"
+      stroke="#EEB1B1"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const RadioCheckedIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+    <rect
+      x="2"
+      y="2"
+      width="22"
+      height="22"
+      rx="15"
+      stroke="#EEB1B1"
+      strokeWidth="2.5"
+    />
+
+    <path
+      d="M7 13.5L11 17.5L19 9.5"
+      stroke="#EEB1B1"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const EmptyBoxIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+    <path
+      d="M22.5652 24H3.43478C3.05425 24 2.68931 23.8488 2.42024 23.5798C2.15116 23.3107 2 22.9457 2 22.5652V3.43478C2 2.64087 2.64087 2 3.43478 2H22.5652C23.3572 2 24 2.64087 24 3.43478V22.5652C24 22.9457 23.8488 23.3107 23.5798 23.5798C23.3107 23.8488 22.9457 24 22.5652 24ZM4.86957 21.1304H21.1304V4.86957H4.86957V21.1304Z"
+      fill="#E9E9E3"
+    />
+  </svg>
+);
+
+const RadioEmptyIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+    <rect
+      x="2"
+      y="2"
+      width="22"
+      height="22"
+      rx="15"
+      stroke="#E9E9E3"
+      strokeWidth="2.5"
+    />
+  </svg>
+);
 
 const Invited = () => {
   const { code } = useParams();
@@ -41,7 +110,12 @@ const Invited = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  const [selectedDeleteIds, setSelectedDeleteIds] = useState([]);
+  const [selectionContext, setSelectionContext] = useState(null);
+  const [selectionValues, setSelectionValues] = useState([]);
+
+  const [prevViewMode, setPrevViewMode] = useState(null);
+
+  const isDeleteMode = selectionContext?.mode === 'delete';
 
   // 토큰 만료 여부 확인
   const isAccessTokenExpired = useCallback((token) => {
@@ -282,6 +356,31 @@ const Invited = () => {
       : "약속 없음";
   };
 
+  const formatEventTime = (event) => {
+    if (!event?.start) return '';
+
+    const startDate = new Date(event.start);
+    const endDate = event.end ? new Date(event.end) : null;
+
+    if (Number.isNaN(startDate.getTime())) return event.title;
+
+    const startTime = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const endTime = endDate && !Number.isNaN(endDate.getTime())
+      ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+
+    return endTime ? `${startTime} - ${endTime}` : startTime;
+  };
+
+  const getDateNumber = (date) => {
+    if (!date) return '0';
+    const d = new Date(date);
+    return Number.isNaN(d.getTime()) ? '0' : d.getDate();
+  };
+
+  
+  const isSelectedId = (id) => selectionValues.includes(id);
+
   const syncMySchedules = async () => {
     const token = localStorage.getItem('access_token');
     
@@ -340,7 +439,7 @@ const Invited = () => {
   const toggleMenu = (e, date) => {
     e.stopPropagation(); 
 
-    if (viewMode === 'delete') return;
+    if (isDeleteMode) return;
 
     const dateMs = date.getTime();
 
@@ -367,17 +466,25 @@ const Invited = () => {
   };
 
   const handleEditClick = (date, eventTitleString) => {
-    const targetEvent = getEventsForDate(date).find((event) =>
-      eventTitleString.includes(event.title)
-    );
+    const dayEvents = getEventsForDate(date);
 
-    if (targetEvent) {
-      setSelectedEvent(targetEvent);
+    if (dayEvents.length === 0) {
+      alert("수정할 약속이 없어요.");
+      return;
+    }
+
+    if (dayEvents.length === 1) {
+      setSelectedEvent(dayEvents[0]);
+      setPrevViewMode('list');
       setViewMode('update');
       setActiveMenuId(null);
-    } else {
-        alert("수정할 약속이 없어요.");
+      return;
     }
+
+    setSelectionContext({ mode: 'edit', date, events: dayEvents });
+    setSelectionValues([dayEvents[0].id]);
+    setViewMode('select-edit');
+    setActiveMenuId(null);
   };
 
   const enterDeleteMode = (date) => {
@@ -386,55 +493,99 @@ const Invited = () => {
         alert("삭제할 약속이 없어요.");
         return;
     }
-    
-    setSelectedDeleteIds([]); 
-    setViewMode('delete');
-    setActiveMenuId(null);
-  };
 
-  const toggleDeleteSelection = (date) => {
-    const targetEvents = getEventsForDate(date);
+    setSelectionContext({ mode: 'delete', date, events: dayEvents });
 
-    if (targetEvents.length === 0) return;
-
-    const targetIds = targetEvents.map(e => e.id);
-    const isSelected = targetIds.every(id => selectedDeleteIds.includes(id));
-
-    if (isSelected) {
-      setSelectedDeleteIds(prev => prev.filter(id => !targetIds.includes(id)));
+    if (dayEvents.length === 1) {
+      setSelectionValues([dayEvents[0].id]);
     } else {
-      setSelectedDeleteIds(prev => [...prev, ...targetIds]);
+      setSelectionValues([]);
     }
+
+    setViewMode('select-edit');
   };
 
-  const confirmDelete = () => {
-    if (selectedDeleteIds.length === 0) {
-        alert("선택된 일정이 없어요.");
-        return;
+  const confirmDelete = (ids) => {
+    if (!ids || ids.length === 0) {
+      alert("선택된 일정이 없어요.");
+      return;
     }
 
     const updatedPendingAdds = pendingAddEvents.filter(
-      (event) => !selectedDeleteIds.includes(event.id)
+      (event) => !ids.includes(event.id)
     );
 
     const newPendingDeleteIds = [
       ...pendingDeleteIds,
-      ...selectedDeleteIds.filter(
+      ...ids.filter(
         (id) =>
           !pendingDeleteIds.includes(id) &&
           pendingAddEvents.every((event) => event.id !== id)
       ),
     ];
 
-    const updatedEvents = allEvents.filter(e => !selectedDeleteIds.includes(e.id));
+    const updatedEvents = allEvents.filter(
+      (event) => !ids.includes(event.id)
+    );
+
     setAllEvents(updatedEvents);
     setPendingAddEvents(updatedPendingAdds);
     setPendingDeleteIds(newPendingDeleteIds);
     setPendingUpdateEvents((prev) =>
-      prev.filter((item) => !selectedDeleteIds.includes(item.id))
+      prev.filter((item) => !ids.includes(item.id))
     );
+    setSelectionContext(null);
+    setSelectionValues([]);
     setViewMode('list');
-    setSelectedDeleteIds([]);
+
+    setActiveMenuId(null);
+    setMenuTargetDate(null);
+  };
+
+  const toggleSelectionValue = (id) => {
+    if (!selectionContext) return;
+
+    if (selectionContext.mode === 'edit') {
+      setSelectionValues([id]);
+      return;
+    }
+
+    setSelectionValues((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectionConfirm = () => {
+    if (!selectionContext) return;
+
+    if (selectionContext.mode === 'edit') {
+      const target = selectionContext.events.find((evt) => evt.id === selectionValues[0]);
+      if (!target) {
+        alert('수정할 일정을 선택해주세요.');
+        return;
+      }
+      setSelectedEvent(target);
+      setPrevViewMode('select-edit');
+      setViewMode('update');
+    } else if (selectionContext.mode === 'delete') {
+      if (selectionValues.length === 0) {
+        alert('삭제할 일정을 선택해주세요.');
+        return;
+      }
+      confirmDelete(selectionValues); 
+      setSelectionContext(null);
+      setSelectionValues([]);
+      setViewMode('list');
+
+      setActiveMenuId(null);
+      setMenuTargetDate(null);
+    }
+
+  };
+
+  const handleSelectionCancel = () => {
+    setSelectionContext(null);
+    setSelectionValues([]);
   };
 
   const saveNewEvent = (eventData) => {
@@ -595,6 +746,119 @@ const Invited = () => {
     );
   }
 
+  if (viewMode === 'select-edit' && selectionContext) {
+  const dateNum = getDateNumber(selectionContext.date);
+
+  return (
+    <div className="event-page-overlay">
+      <div className="event-page-container">
+        {/* 상단 질문 영역 */}
+        <div className="create-header-wrapper">
+          <div className="header-icon">
+            {selectionContext.mode === 'delete'
+              ? <ExclamationIcon />
+              : <QuestionIcon />}
+          </div>
+          <h2 className="header-title-text">
+            {selectionContext.mode === 'delete'
+              ? <>어떤 일정을<br />삭제하시겠어요?</>
+              : <>어떤 일정을<br />수정하시겠어요?</>}
+          </h2>
+          <p className="header-sub-text">약속이 여러 개시네요</p>
+        </div>
+
+        {/* 날짜 카드 */}
+        <div className="selected-date-box" style={{ backgroundColor: '#F9CBAA' }}>
+          <div className="selected-date-num" style={{ color: '#FFFFFF' }}>
+            {dateNum}
+          </div>
+          <div className="date-check-icon"><DateCheckIcon /></div>
+        </div>
+
+        {/* 일정 리스트 (radio 선택) */}
+        <div className="selection-list">
+          {selectionContext.events.map((evt) => (
+            <div
+  key={evt.id}
+  className={`selection-item ${isSelectedId(evt.id) ? 'selected' : ''}`}
+  onClick={() => {
+  if (selectionContext.mode === 'edit') {
+    setSelectionValues([evt.id]); // 라디오
+  } else {
+    setSelectionValues(prev =>
+      prev.includes(evt.id)
+        ? prev.filter(id => id !== evt.id)
+        : [...prev, evt.id]
+    ); // 체크박스
+  }
+}}
+>
+  <div className="selection-info">
+    <span className="selection-title">{evt.title}</span>
+    <span className="selection-time">{formatEventTime(evt)}</span>
+  </div>
+
+  <div className="selection-check">
+    {selectionContext.mode === 'edit' ? (
+    isSelectedId(evt.id) ? <RadioCheckedIcon /> : <RadioEmptyIcon />
+  ) : (
+    isSelectedId(evt.id) ? <CheckedBoxIcon /> : <EmptyBoxIcon />
+  )}
+  </div>
+</div>
+          ))}
+        </div>
+
+        {/* 하단 버튼 */}
+        <div className="button-group">
+          {selectionContext.mode === 'delete' ? (
+    <>
+      <button
+        className="btn primary"
+        onClick={handleSelectionConfirm}
+      >
+        삭제하기
+      </button>
+      <button
+        className="btn secondary"
+        onClick={() => {
+          setSelectionContext(null);
+          setSelectionValues([]);
+          setViewMode('list');
+
+          setActiveMenuId(null);
+          setMenuTargetDate(null);
+        }}
+      >
+        취소
+      </button>
+    </>
+  ) : (
+    <>
+      <button
+        className="btn primary"
+        onClick={handleSelectionConfirm}
+      >
+        선택하기
+      </button>
+      <button
+        className="btn secondary"
+        onClick={() => {
+          setSelectionContext(null);
+          setSelectionValues([]);
+          setViewMode('list');
+        }}
+      >
+        뒤로가기
+      </button>
+    </>
+  )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
   if (viewMode === 'update') {
     return (
       <div className="invite-view-wrapper">
@@ -603,15 +867,21 @@ const Invited = () => {
             <UpdateEvent
               event={selectedEvent}
               onSave={updateEvent}
-              onCancel={() => setViewMode('list')}
+              onCancel={() => {
+                if (prevViewMode === 'select-edit') {
+                  setViewMode('select-edit');
+                } else {
+                  setSelectionContext(null);   
+                  setSelectionValues([]);  
+                  setViewMode('list');
+                }
+              }}
             />
           </div>
         </div>
       </div>
     );
   }
-
-  const isDeleteMode = viewMode === 'delete';
 
   return (
     <div className="invite-view-wrapper">
@@ -652,7 +922,7 @@ const Invited = () => {
                         eDate.setHours(0,0,0,0);
                         const dDate = new Date(candidate.date);
                         dDate.setHours(0,0,0,0);
-                        return eDate.getTime() === dDate.getTime() && selectedDeleteIds.includes(e.id);
+                        return eDate.getTime() === dDate.getTime() && selectionValues.includes(e.id);
                     });
 
                     return (
@@ -661,7 +931,6 @@ const Invited = () => {
                         className="event-box"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isDeleteMode && hasEvent) toggleDeleteSelection(candidate.date);
                         }}
                         style={{
                           backgroundColor: hasEvent ? "#F9CBAA" : "#E9E9E3",
@@ -697,14 +966,6 @@ const Invited = () => {
                     ) : (
                       <span className="event-title">약속 없음</span>
                     )}
-                    {/* <span className="availability-chip">
-                      {candidate.availableCount}/{candidate.totalCount} 참여
-                      {candidate.availability === "all"
-                        ? " - 모두 가능"
-                        : candidate.availability === "partial"
-                        ? " - 일부 가능"
-                        : " - 미응답"}
-                    </span> */}
                   </div>
                 </div>
               );
@@ -743,33 +1004,9 @@ const Invited = () => {
       )}
 
       <footer>
-            {isDeleteMode ? (
-              <>
-              <button
-                className="confirm-btn"
-                style={{ background: '#1F1F1F', width: '100px' }}
-                onClick={confirmDelete}
-              >
-                네
-              </button>
-              <button
-                className="edit-btn"
-                style={{ width: '100px', background: '#E9E9E3', color: '#555' }}
-                onClick={() => {
-                  setViewMode('list');
-                  setSelectedDeleteIds([]);
-                }}
-              >
-                아니오
-              </button>
-            </>
-            ) : (
-              <>
-                <button className="confirm-btn" onClick={handleConfirm}>확인</button>
-                <button className="edit-btn">나의 일정 수정하기</button>
-              </>
-            )}
-          </footer>
+          <button className="confirm-btn" onClick={handleConfirm}>확인</button>
+          {/* <button className="edit-btn">나의 일정 수정하기</button> */}
+      </footer>
         </div>
       </div>
     </div>

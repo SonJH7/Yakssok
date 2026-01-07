@@ -374,7 +374,7 @@ const Calendar = ({ events: initialEvents = [] , onEventSelect }) => {
                 onClick={handleSyncSchedules}
                 disabled={isSyncing}
               >
-                <span className="sync-label">{isSyncing ? '동기화 중…' : '내 일정 동기화'}</span>
+                <span className="sync-label">{isSyncing ? '동기화 중…' : '일정 새로고침'}</span>
                 {!isSyncing && (
                   <span className="sync-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -397,3 +397,200 @@ footer {
 .edit-icon-pos:active {
   transform: scale(0.95);
 }
+
+.selection-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 2000;
+}
+
+.selection-modal {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.selection-modal h3 {
+  margin: 0 0 16px 0;
+  color: #1F1F1F;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.selection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.selection-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #E9E9E3;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.selection-item input {
+  width: 18px;
+  height: 18px;
+}
+
+.selection-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selection-title {
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.selection-time {
+  font-size: 13px;
+  color: #85837B;
+}
+
+.selection-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* ===============================
+   일정 선택(select-edit) 화면
+   =============================== */
+
+/* ---------- 상단 질문 영역 ---------- */
+/* .create-header-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center;
+  gap: 12px;
+  width: 240px;
+} */
+
+/* 메인 질문 텍스트 */
+.header-title-text {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 28px;
+  text-align: center;
+  color: #85837B;
+  margin: 0;
+  order: 1 !important;
+}
+
+/* 서브 멘트 (아래에 위치) */
+.header-sub-text {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
+  text-align: center;
+  color: #C4C5B7;
+  margin: -12px 0 0 0;
+  order: 2 !important;
+}
+
+/* ---------- 일정 선택 리스트 (Frame 18 스타일) ---------- */
+
+.selection-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.selection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  width: 300px;
+  height: 45px;
+  padding: 15px 28px;
+
+  background: #F7F7F0;
+  border-radius: 20px;
+  border: none;
+
+  cursor: pointer;
+}
+
+.selection-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+
+  width: 195px;
+}
+
+/* 일정 제목 */
+.selection-title {
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 24px;
+  color: #292929;
+  white-space: nowrap;
+}
+
+/* 일정 시간 */
+.selection-time {
+  font-family: 'Pretendard';
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 24px;
+  color: #85837B;
+  white-space: nowrap;
+}
+
+.selection-check {
+  display: flex;
+  align-items: center;
+}
+
+/* ---------- 하단 버튼 ---------- */
+.event-page-container .button-group {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  margin-top: 60px;
+}
+
+.event-page-container .btn {
+  flex: 1;
+  height: 57px;
+  border-radius: 20px;
+  font-size: 18px;
+  font-weight: 500;
+  border: none;
+}
+
+.event-page-container .btn.primary {
+  background: #1F1F1F;
+  color: #FDFDF8;
+}
+
+.event-page-container .btn.secondary {
+  background: #E9E9E3;
+  color: #85837B;
+}
