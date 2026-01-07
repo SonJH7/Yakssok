@@ -123,6 +123,8 @@ const UpdateEvent = ({ event, eventsForDate = [], onSave, onCancel }) => {
       ]
     : sourceEvents;
 
+  const isMultiEdit = orderedEvents.length > 1;
+
   return (
     <div className="event-page-overlay">
       <div className="event-page-container">
@@ -156,7 +158,9 @@ const UpdateEvent = ({ event, eventsForDate = [], onSave, onCancel }) => {
               return (
                 <span
                   key={evt.id || title}
-                  className={`selected-event-title${isSelected ? ' selected-event-title--active' : ''}`}
+
+                  className={`selected-event-title${isSelected && isMultiEdit ? ' selected-event-title--active' : ''}`}
+
                 >
                   {title}
                 </span>

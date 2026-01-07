@@ -791,143 +791,137 @@ const Invited = () => {
     const isMultiEdit =
       selectionContext.mode === 'edit' &&
       selectionContext.events.length > 1;
-  const dateNum = getDateNumber(selectionContext.date);
-  const selectedEditId = selectionContext.mode === 'edit' ? selectionValues[0] : null;
-  const shouldHighlight = isMultiEdit;
-  const orderedSelectionEvents = selectedEditId
-    ? [
-        ...selectionContext.events.filter((evt) => evt.id === selectedEditId),
-        ...selectionContext.events.filter((evt) => evt.id !== selectedEditId),
-      ]
-    : selectionContext.events;
+    const isDeleteSelection = selectionContext.mode === 'delete';
+    const dateNum = getDateNumber(selectionContext.date);
+    const selectedEditId = selectionContext.mode === 'edit' ? selectionValues[0] : null;
+    const orderedSelectionEvents = selectedEditId
+      ? [
+          ...selectionContext.events.filter((evt) => evt.id === selectedEditId),
+          ...selectionContext.events.filter((evt) => evt.id !== selectedEditId),
+        ]
+      : selectionContext.events;
 
-  return (
-    <div className="event-page-overlay">
-      <div className="event-page-container">
-        {/* 상단 질문 영역 */}
-        <div className="create-header-wrapper">
-          <div className="header-icon">
-            {selectionContext.mode === 'delete'
-              ? <ExclamationIcon />
-              : <QuestionIcon />}
+    return (
+      <div className="event-page-overlay">
+        <div className="event-page-container">
+          {/* 상단 질문 영역 */}
+          <div className="create-header-wrapper">
+            <div className="header-icon">
+              {selectionContext.mode === 'delete' ? <ExclamationIcon /> : <QuestionIcon />}
+            </div>
+            <h2 className="header-title-text">
+              {selectionContext.mode === 'delete'
+                ? <>어떤 일정을<br />삭제하시겠어요?</>
+                : <>어떤 일정을<br />수정하시겠어요?</>}
+            </h2>
+            <p className="header-sub-text">약속이 여러 개시네요</p>
           </div>
-          <h2 className="header-title-text">
-            {selectionContext.mode === 'delete'
-              ? <>어떤 일정을<br />삭제하시겠어요?</>
-              : <>어떤 일정을<br />수정하시겠어요?</>}
-          </h2>
-          <p className="header-sub-text">약속이 여러 개시네요</p>
-        </div>
 
         {/* 날짜 카드 */}
-        <div className="selected-date-box" style={{ backgroundColor: isMultiEdit ? '#F9CBAA' : 'transparent' }}>
-          <div className="selected-date-num" style={{ color: '#FFFFFF' }}>
-            {dateNum}
-          </div>
-          <div className="date-check-icon"><DateCheckIcon /></div>
-          <div className="selected-event-title-list" style={{ color: '#FFFFFF' }}>
-            {orderedSelectionEvents.map((evt) => {
-              const isSelected = evt.id === selectedEditId;
-              return (
+          <div
+            className="selected-date-box"
+            style={{ backgroundColor: isMultiEdit || isDeleteSelection ? '#F9CBAA' : 'transparent' }}
+          >
+            <div className="selected-date-num" style={{ color: '#FFFFFF' }}>
+              {dateNum}
+            </div>
+            <div className="date-check-icon"><DateCheckIcon /></div>
+            <div className="selected-event-title-list" style={{ color: '#FFFFFF' }}>
+              {orderedSelectionEvents.map((evt) => (
                 <span
                   key={evt.id}
-                  className={`selected-event-title${
-                    shouldHighlight && evt.id === selectedEditId
-                      ? ' selected-event-title--active'
-                      : ''
-                  }`}
+                  className="selected-event-title"
                 >
                   {evt.title}
                 </span>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
 
         {/* 일정 리스트 (radio 선택) */}
-        <div className="selection-list">
-          {selectionContext.events.map((evt) => (
-            <div
-  key={evt.id}
-  className={`selection-item ${isSelectedId(evt.id) ? 'selected' : ''}`}
-  onClick={() => {
-  if (selectionContext.mode === 'edit') {
-    setSelectionValues([evt.id]); // 라디오
-  } else {
-    setSelectionValues(prev =>
-      prev.includes(evt.id)
-        ? prev.filter(id => id !== evt.id)
-        : [...prev, evt.id]
-    ); // 체크박스
-  }
-}}
->
-  <div className="selection-info">
-    <span className="selection-title">{evt.title}</span>
-    <span className="selection-time">{formatEventTime(evt)}</span>
-  </div>
+          <div className="selection-list">
+            {selectionContext.events.map((evt) => (
+              <div
+                key={evt.id}
+                className={`selection-item ${isSelectedId(evt.id) ? 'selected' : ''}`}
+                onClick={() => {
+                  if (selectionContext.mode === 'edit') {
+                    setSelectionValues([evt.id]); // 라디오
+                  } else {
+                    setSelectionValues((prev) =>
+                      prev.includes(evt.id)
+                        ? prev.filter((id) => id !== evt.id)
+                        : [...prev, evt.id]
+                    ); // 체크박스
+                  }
+                }}
+              >
+                <div className="selection-info">
+                  <span className="selection-title">{evt.title}</span>
+                  <span className="selection-time">{formatEventTime(evt)}</span>
+                </div>
 
-  <div className="selection-check">
-    {selectionContext.mode === 'edit' ? (
-    isSelectedId(evt.id) ? <RadioCheckedIcon /> : <RadioEmptyIcon />
-  ) : (
-    isSelectedId(evt.id) ? <CheckedBoxIcon /> : <EmptyBoxIcon />
-  )}
-  </div>
-</div>
-          ))}
-        </div>
+                <div className="selection-check">
+                  {selectionContext.mode === 'edit' ? (
+                    isSelectedId(evt.id) ? <RadioCheckedIcon /> : <RadioEmptyIcon />
+                  ) : (
+                    isSelectedId(evt.id) ? <CheckedBoxIcon /> : <EmptyBoxIcon />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
 
-        {/* 하단 버튼 */}
-        <div className="button-group">
-          {selectionContext.mode === 'delete' ? (
-    <>
-      <button
-        className="btn primary"
-        onClick={handleSelectionConfirm}
-        disabled={selectionValues.length === 0}
-      >
-        삭제하기
-      </button>
-      <button
-        className="btn secondary"
-        onClick={() => {
-          setSelectionContext(null);
-          setSelectionValues([]);
-          setViewMode('list');
+          {/* 하단 버튼 */}
+          <div className="button-group">
+            {selectionContext.mode === 'delete' ? (
+              <>
+                <button
+                  className="btn primary"
+                  onClick={handleSelectionConfirm}
+                  disabled={selectionValues.length === 0}
+                >
+                  삭제하기
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => {
+                    setSelectionContext(null);
+                    setSelectionValues([]);
+                    setViewMode('list');
 
-          setActiveMenuId(null);
-          setMenuTargetDate(null);
-        }}
-      >
-        취소
-      </button>
-    </>
-  ) : (
-    <>
-      <button
-        className="btn primary"
-        onClick={handleSelectionConfirm}
-      >
-        선택하기
-      </button>
-      <button
-        className="btn secondary"
-        onClick={() => {
-          setSelectionContext(null);
-          setSelectionValues([]);
-          setViewMode('list');
-        }}
-      >
-        뒤로가기
-      </button>
-    </>
-  )}
+                    setActiveMenuId(null);
+                    setMenuTargetDate(null);
+                  }}
+                >
+                  취소
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn primary"
+                  onClick={handleSelectionConfirm}
+                >
+                  선택하기
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={() => {
+                    setSelectionContext(null);
+                    setSelectionValues([]);
+                    setViewMode('list');
+                  }}
+                >
+                  뒤로가기
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   if (viewMode === 'update') {
     return (

@@ -580,7 +580,7 @@ footer {
   width: 100%;
   display: flex;
   gap: 12px;
-  margin-top: 60px;
+  margin-top: 40px;
 }
 
 .event-page-container .btn {
@@ -598,6 +598,6 @@ footer {
 }
 
 .event-page-container .btn.secondary {
-  background: #E9E9E3;
+  background: #f7f7f0;
   color: #85837B;
 }

@@ -170,6 +170,12 @@ button, .custom-header span, .fc-col-header-cell-cushion {
   gap: 30px;
 }
 
+.fc-daygrid-body,
+.fc-daygrid-body-unbalanced,
+.fc-timegrid-body {
+  background-color: #F7F7F0;
+}
+
 .fc-theme-standard td,
 .fc-theme-standard th,
 .fc-theme-standard .fc-scrollgrid {
@@ -193,7 +199,7 @@ button, .custom-header span, .fc-col-header-cell-cushion {
   justify-content: flex-start; 
   overflow: hidden;
   align-items: flex-start;
-  background-color: #FDFDF8; 
+  background-color: #F7F7F0; 
 }
 
 /* 날짜 번호 */
@@ -589,5 +595,28 @@ button, .custom-header span, .fc-col-header-cell-cushion {
   }
 }
 
+.fc-timegrid-event,
+.fc-timegrid-event-harness,
+.fc-event {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
 
+.fc-timegrid-slot-label-frame,
+.fc-timegrid-slot-label-frame * {
+  color: #292929 !important;
+}
+
+.weekly-header-daynumber {
+  color: #292929 !important;
+}
+
+div.date-number {
+  color: #292929 !important;
+}
+
+.calendar-container .fc-view-harness {
+  padding: 0 !important;
+}
 

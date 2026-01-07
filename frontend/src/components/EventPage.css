@@ -31,7 +31,7 @@
 .event-page-container {
   width: 100%;
   max-width: 400px;
-  padding: 20px;
+  padding: 36px 20px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -47,8 +47,7 @@
   padding: 0px;
   gap: 15px;
   
-  margin-top: 10px; 
-  /* margin-bottom은 DateBox가 있어서 제거하거나 줄임 */
+  margin-top: 40px; 
   width: 100%;
 }
 
@@ -87,7 +86,7 @@
   font-family: 'Pretendard', sans-serif;
   font-size: 14px;
   color: #BBCEA0; 
-  margin-top: -10px;
+  margin-top: 4px;
 }
 
 /* ---------------------------------------------------- /
@@ -108,7 +107,7 @@
   border-radius: 15px;
   
   /* 헤더와 입력폼 사이 간격 */
-  margin: 60px auto; 
+  margin: 45px auto; 
   
   position: relative;
   box-sizing: border-box;
@@ -168,6 +167,7 @@
   gap: 39px; /* 라벨과 입력창 사이 간격 */
   
   width: 100%;
+  margin-top: 10px;
   margin-bottom: 20px;
 }
 
@@ -298,7 +298,7 @@
 }
 
 .btn.secondary {
-  background-color: #E9E9E3;
+  background-color: #f7f7f0;
   color: #555;
 }
 
